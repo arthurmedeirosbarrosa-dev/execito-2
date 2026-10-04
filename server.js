@@ -15,13 +15,41 @@ const express = require("express"), crypto = require("crypto");
 const { ROBLOX_API_KEY: KEY, ROBLOX_CLIENT_ID: CID, ROBLOX_CLIENT_SECRET: CSECRET, ROBLOX_REDIRECT_URI: REDIRECT_URI, FRONTEND_URL: SITE_ORIGIN } = process.env;
 const GROUP = process.env.GROUP_ID || "196751381"; // "EB" Exército Brasileiro do Yso
 
+// Escada oficial de patentes do grupo "YSO", do mais baixo ao mais alto, com o ID real
+// de cada cargo no Roblox. A promoção/rebaixamento segue esta lista, não a ordem genérica
+// que a API do Roblox devolve (que pode vir fora de ordem).
+const LADDER = [
+  { id: 12884901889, name: "Recruta" },
+  { id: 715019054, name: "Soldado" },
+  { id: 713989066, name: "Cabo" },
+  { id: 715025062, name: "Terceiro Sargento" },
+  { id: 711739168, name: "Segundo Sargento" },
+  { id: 710511162, name: "Primeiro Sargento" },
+  { id: 714853049, name: "Subtenente" },
+  { id: 715001058, name: "Cadete" },
+  { id: 712889286, name: "Aspirante à Oficial" },
+  { id: 714371076, name: "Segundo Tenente" },
+  { id: 715297056, name: "Primeiro Tenente" },
+  { id: 713887094, name: "Capitão" },
+  { id: 713249156, name: "Major" },
+  { id: 714691047, name: "Tenente Coronel" },
+  { id: 715001059, name: "Coronel" },
+  { id: 714805131, name: "General de Brigada" },
+  { id: 713919074, name: "General de Divisão" },
+  { id: 715019055, name: "General de Exército" },
+  { id: 715223052, name: "Subcomandante" },
+  { id: 713051207, name: "Comandante" },
+];
+// Teto da promoção automática (quem não tem poder total só sobe até aqui).
+const AUTO_TOP_NAME = "General de Exército";
+
 // Nicks do Roblox (minúsculo) de quem é CEx ou SGEx: podem promover OU rebaixar
 // qualquer militar para qualquer patente, menos a si mesmos. Edite esta lista à mão
 // sempre que alguém virar ou deixar de ser CEx/SGEx.
 const SUPER_USERS = ["tutu2345no"];
-// Além da lista acima, Criador [CR] e Sub Criador [SCR] têm esse mesmo poder total
-// automaticamente, por serem cargo real do grupo no Roblox — não precisa cadastrar nick.
-const SUPER_TAGS = ["[CR]", "[SCR]"];
+// Além da lista acima, Creator e Sub Creator têm esse mesmo poder total automaticamente,
+// por serem cargo real do grupo no Roblox (nomes exatos, sem tag) — não precisa cadastrar nick.
+const SUPER_TAGS = ["Creator", "Sub Creator"];
 function isSuper(nick, roleName) {
   if (SUPER_USERS.includes(String(nick || "").toLowerCase())) return true;
   return !!roleName && SUPER_TAGS.some(tag => roleName.includes(tag));
@@ -113,10 +141,7 @@ app.get("/api/session", async (q, s) => {
 });
 
 // Lista pública das patentes do grupo, para preencher a lista de escolha do CEx/SGEx no site.
-app.get("/api/roles", async (q, s) => {
-  const roles = (await j(`https://groups.roblox.com/v1/groups/${GROUP}/roles`)).roles.sort((a, b) => a.rank - b.rank);
-  s.json(roles.map(r => ({ id: r.id, name: r.name })));
-});
+app.get("/api/roles", (q, s) => s.json(LADDER));
 
 app.get("/auth/logout", (q, s) => s.redirect(q.query.return || SITE_ORIGIN));
 
@@ -148,19 +173,21 @@ app.post("/api/promote", async (q, s) => {
     const [mine, cur] = await Promise.all([role(me.id), role(t.id)]);
     if (!mine || !cur) return s.json({ error: "Os dois precisam estar no grupo." });
 
-    const roles = (await j(`https://groups.roblox.com/v1/groups/${GROUP}/roles`)).roles.sort((a, b) => a.rank - b.rank);
     const meSuper = isSuper(me.nick, mine.name);
+    const curIdx = LADDER.findIndex(x => x.id === cur.id);
 
     let next;
     if (meSuper && q.body.toRoleId) {
-      next = roles.find(x => String(x.id) === String(q.body.toRoleId));
+      next = LADDER.find(x => String(x.id) === String(q.body.toRoleId));
       if (!next) return s.json({ error: "Patente escolhida não existe." });
       if (next.id === cur.id) return s.json({ error: "Esse militar já está nessa patente." });
     } else {
-      next = roles[roles.findIndex(x => x.id === cur.id) + 1];
-      const top = roles.find(x => x.name.includes("[GEN-E]")); // teto de promoção automática
-      if (!next || (top && next.rank > top.rank)) return s.json({ error: "Patente máxima alcançável por promoção." });
-      if (mine.rank <= next.rank) return s.json({ error: "Sua patente precisa ser maior que " + next.name + "." });
+      if (curIdx === -1) return s.json({ error: "Esse militar está num cargo fora da escada de patentes." });
+      next = LADDER[curIdx + 1];
+      const topIdx = LADDER.findIndex(x => x.name === AUTO_TOP_NAME);
+      if (!next || curIdx + 1 > topIdx) return s.json({ error: "Patente máxima alcançável por promoção." });
+      const mineIdx = LADDER.findIndex(x => x.id === mine.id);
+      if (mineIdx === -1 || mineIdx <= curIdx + 1) return s.json({ error: "Sua patente precisa ser maior que " + next.name + "." });
     }
 
     const r = await fetch(`https://apis.roblox.com/cloud/v2/groups/${GROUP}/memberships/${t.id}`, {
