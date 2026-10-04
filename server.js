@@ -1,0 +1,160 @@
+// Servidor do painel — login oficial do Roblox (OAuth), igual ao Rover.
+// Requer Node 18+ e: npm i express
+//
+// Variáveis de ambiente necessárias (configure no Render, aba "Environment"):
+//   ROBLOX_CLIENT_ID, ROBLOX_CLIENT_SECRET  -> criados em https://create.roblox.com/dashboard/credentials (aba OAuth 2.0)
+//   ROBLOX_REDIRECT_URI -> ex.: https://seu-servidor.onrender.com/auth/callback (cadastre esse mesmo endereço no painel do Roblox)
+//   FRONTEND_URL        -> endereço do site publicado (para liberar CORS e redirecionar de volta)
+//   ROBLOX_API_KEY      -> Open Cloud, com permissão de editar membros do grupo (create.roblox.com/dashboard/credentials)
+//   GROUP_ID            -> ID do grupo (opcional, já vem com o valor do "EB Exército Brasileiro do Yso")
+//   TURNSTILE_SECRET_KEY -> não usado neste servidor; pode deixar em branco
+//
+// No painel OAuth do Roblox, marque os escopos "openid" e "profile".
+
+const express = require("express"), crypto = require("crypto");
+const { ROBLOX_API_KEY: KEY, ROBLOX_CLIENT_ID: CID, ROBLOX_CLIENT_SECRET: CSECRET, ROBLOX_REDIRECT_URI: REDIRECT_URI, FRONTEND_URL: SITE_ORIGIN } = process.env;
+const GROUP = process.env.GROUP_ID || "196751381"; // "EB" Exército Brasileiro do Yso
+
+// Nicks do Roblox (minúsculo) de quem é CEx ou SGEx: podem promover OU rebaixar
+// qualquer militar para qualquer patente, menos a si mesmos. Edite esta lista à mão
+// sempre que alguém virar ou deixar de ser CEx/SGEx.
+const SUPER_USERS = ["tutu2345no"];
+// Além da lista acima, Criador [CR] e Sub Criador [SCR] têm esse mesmo poder total
+// automaticamente, por serem cargo real do grupo no Roblox — não precisa cadastrar nick.
+const SUPER_TAGS = ["[CR]", "[SCR]"];
+function isSuper(nick, roleName) {
+  if (SUPER_USERS.includes(String(nick || "").toLowerCase())) return true;
+  return !!roleName && SUPER_TAGS.some(tag => roleName.includes(tag));
+}
+
+const app = express();
+app.use(express.json());
+app.use((q, s, n) => {
+  s.set({ "Access-Control-Allow-Origin": SITE_ORIGIN || "*", "Access-Control-Allow-Headers": "Content-Type" });
+  q.method === "OPTIONS" ? s.end() : n();
+});
+
+const sessions = new Map();   // token  -> { id, nick }
+const pending  = new Map();   // state  -> return URL (anti-CSRF do login)
+const oneTime  = new Map();   // authcode -> token (troca única depois do redirect)
+
+const j = (u, o) => fetch(u, o).then(r => r.json());
+
+// 1) Manda a pessoa para a tela OFICIAL do Roblox. A senha é digitada lá, nunca no nosso site.
+app.get("/auth/start", (q, s) => {
+  const state = crypto.randomUUID();
+  pending.set(state, q.query.return || SITE_ORIGIN);
+  const url = new URL("https://apis.roblox.com/oauth/v1/authorize");
+  url.search = new URLSearchParams({
+    client_id: CID, redirect_uri: REDIRECT_URI, scope: "openid profile",
+    response_type: "code", state
+  }).toString();
+  s.redirect(url.toString());
+});
+
+// 2) O Roblox manda a pessoa de volta pra cá com um "code" de uso único.
+app.get("/auth/callback", async (q, s) => {
+  try {
+    const { code, state } = q.query;
+    const back = pending.get(state); pending.delete(state);
+    if (!back) return s.status(400).send("Login expirado, tente de novo.");
+
+    const tok = await j("https://apis.roblox.com/oauth/v1/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: CID, client_secret: CSECRET,
+        grant_type: "authorization_code", code, redirect_uri: REDIRECT_URI
+      })
+    });
+    if (!tok.access_token) return s.status(400).send("O Roblox recusou o login.");
+
+    const me = await j("https://apis.roblox.com/oauth/v1/userinfo", {
+      headers: { Authorization: "Bearer " + tok.access_token }
+    });
+
+    const session = crypto.randomUUID();
+    sessions.set(session, { id: me.sub, nick: me.preferred_username });
+
+    const authcode = crypto.randomUUID();
+    oneTime.set(authcode, session);
+    setTimeout(() => oneTime.delete(authcode), 60000); // expira em 1 min se não for usado
+
+    const back2 = new URL(back); back2.searchParams.set("authcode", authcode);
+    s.redirect(back2.toString());
+  } catch (e) { s.status(500).send("Falha ao falar com o Roblox."); }
+});
+
+// 3) O site troca o código de uma única vez por nick + patente atual no grupo.
+app.get("/api/session", async (q, s) => {
+  const session = oneTime.get(q.query.code);
+  oneTime.delete(q.query.code);
+  const me = session && sessions.get(session);
+  if (!me) return s.json({ error: "Login expirado, entre de novo." });
+  const r = await role(me.id);
+  if (!r) return s.json({ error: "Você não está no grupo do jogo." });
+  s.json({ token: session, nick: me.nick, label: r.name, isSuper: isSuper(me.nick, r.name) });
+});
+
+// Lista pública das patentes do grupo, para preencher a lista de escolha do CEx/SGEx no site.
+app.get("/api/roles", async (q, s) => {
+  const roles = (await j(`https://groups.roblox.com/v1/groups/${GROUP}/roles`)).roles.sort((a, b) => a.rank - b.rank);
+  s.json(roles.map(r => ({ id: r.id, name: r.name })));
+});
+
+app.get("/auth/logout", (q, s) => s.redirect(q.query.return || SITE_ORIGIN));
+
+async function user(nick) {
+  const d = await j("https://users.roblox.com/v1/usernames/users", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usernames: [nick], excludeBannedUsers: true })
+  });
+  return d.data && d.data[0];
+}
+async function role(id) { // cargo atual no grupo: {id, name, rank}
+  const d = await j(`https://groups.roblox.com/v2/users/${id}/groups/roles`);
+  const g = d.data.find(x => String(x.group.id) === String(GROUP));
+  return g && g.role;
+}
+
+// A patente de quem promove vem da sessão (logada no Roblox), nunca do navegador.
+// body.toRoleId presente -> só usado se "me" tiver poder total (CEx, SGEx, CR ou SCR);
+// nesse caso pode escolher qualquer patente, inclusive para rebaixar. Sem isso, continua
+// a regra antiga: só sobe uma patente, e só se a patente de quem promove for maior.
+app.post("/api/promote", async (q, s) => {
+  try {
+    const me = sessions.get(q.body.token);
+    if (!me) return s.json({ error: "Sessão inválida. Entre de novo." });
+    const t = await user(q.body.target);
+    if (!t) return s.json({ error: "Militar não encontrado." });
+    if (t.id === me.id) return s.json({ error: "Você não pode promover a si mesmo." });
+
+    const [mine, cur] = await Promise.all([role(me.id), role(t.id)]);
+    if (!mine || !cur) return s.json({ error: "Os dois precisam estar no grupo." });
+
+    const roles = (await j(`https://groups.roblox.com/v1/groups/${GROUP}/roles`)).roles.sort((a, b) => a.rank - b.rank);
+    const meSuper = isSuper(me.nick, mine.name);
+
+    let next;
+    if (meSuper && q.body.toRoleId) {
+      next = roles.find(x => String(x.id) === String(q.body.toRoleId));
+      if (!next) return s.json({ error: "Patente escolhida não existe." });
+      if (next.id === cur.id) return s.json({ error: "Esse militar já está nessa patente." });
+    } else {
+      next = roles[roles.findIndex(x => x.id === cur.id) + 1];
+      const top = roles.find(x => x.name.includes("[GEN-E]")); // teto de promoção automática
+      if (!next || (top && next.rank > top.rank)) return s.json({ error: "Patente máxima alcançável por promoção." });
+      if (mine.rank <= next.rank) return s.json({ error: "Sua patente precisa ser maior que " + next.name + "." });
+    }
+
+    const r = await fetch(`https://apis.roblox.com/cloud/v2/groups/${GROUP}/memberships/${t.id}`, {
+      method: "PATCH", headers: { "x-api-key": KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ role: `groups/${GROUP}/roles/${next.id}` })
+    });
+    if (!r.ok) return s.json({ error: "O Roblox recusou a mudança de cargo." });
+
+    s.json({ nick: t.name, from: cur.name, to: next.name });
+  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
+});
+
+app.listen(process.env.PORT || 3000);
