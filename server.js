@@ -30,7 +30,8 @@ function isSuper(nick, roleName) {
 const app = express();
 app.use(express.json());
 app.use((q, s, n) => {
-  s.set({ "Access-Control-Allow-Origin": SITE_ORIGIN || "*", "Access-Control-Allow-Headers": "Content-Type" });
+  // "*" é seguro aqui: não usamos cookies/sessão de navegador, só tokens passados explicitamente.
+  s.set({ "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type" });
   q.method === "OPTIONS" ? s.end() : n();
 });
 
@@ -43,7 +44,8 @@ const j = (u, o) => fetch(u, o).then(r => r.json());
 // 1) Manda a pessoa para a tela OFICIAL do Roblox. A senha é digitada lá, nunca no nosso site.
 app.get("/auth/start", (q, s) => {
   const state = crypto.randomUUID();
-  pending.set(state, q.query.return || SITE_ORIGIN);
+  pending.set(state, true);
+  setTimeout(() => pending.delete(state), 10 * 60000);
   const url = new URL("https://apis.roblox.com/oauth/v1/authorize");
   url.search = new URLSearchParams({
     client_id: CID, redirect_uri: REDIRECT_URI, scope: "openid profile",
@@ -52,12 +54,14 @@ app.get("/auth/start", (q, s) => {
   s.redirect(url.toString());
 });
 
-// 2) O Roblox manda a pessoa de volta pra cá com um "code" de uso único.
+// 2) O Roblox manda a pessoa de volta pra cá com um "code" de uso único. Em vez de tentar
+// redirecionar automaticamente de volta ao site (o que falha dentro da janela do Claude),
+// mostramos um código curto na tela para a pessoa colar manualmente no site.
 app.get("/auth/callback", async (q, s) => {
   try {
     const { code, state } = q.query;
-    const back = pending.get(state); pending.delete(state);
-    if (!back) return s.status(400).send("Login expirado, tente de novo.");
+    if (!pending.has(state)) return s.status(400).send("Login expirado, volte ao site e tente de novo.");
+    pending.delete(state);
 
     const tok = await j("https://apis.roblox.com/oauth/v1/token", {
       method: "POST",
@@ -76,12 +80,24 @@ app.get("/auth/callback", async (q, s) => {
     const session = crypto.randomUUID();
     sessions.set(session, { id: me.sub, nick: me.preferred_username });
 
-    const authcode = crypto.randomUUID();
+    const authcode = Math.random().toString(36).slice(2, 6).toUpperCase() + "-" + Math.random().toString(36).slice(2, 6).toUpperCase();
     oneTime.set(authcode, session);
-    setTimeout(() => oneTime.delete(authcode), 60000); // expira em 1 min se não for usado
+    setTimeout(() => oneTime.delete(authcode), 10 * 60000); // expira em 10 min se não for usado
 
-    const back2 = new URL(back); back2.searchParams.set("authcode", authcode);
-    s.redirect(back2.toString());
+    s.send(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Login feito</title>
+<style>body{font-family:sans-serif;background:#141a11;color:#e8ecdc;text-align:center;padding:40px 20px}
+code{display:inline-block;font-size:1.8rem;letter-spacing:2px;background:#1d2619;border:1px solid #34422d;
+border-radius:6px;padding:14px 22px;margin:18px 0;color:#6aa55c;font-weight:700}
+button{padding:10px 18px;border:0;border-radius:4px;background:#6aa55c;color:#0d140a;font-weight:700;font-size:1rem}
+p{max-width:420px;margin:10px auto;line-height:1.5}</style></head><body>
+<h2>Login feito, ${me.preferred_username}!</h2>
+<p>Volte para a aba do site do Exército Brasileiro e cole este código onde pedir:</p>
+<code id="c">${authcode}</code><br>
+<button onclick="navigator.clipboard.writeText(document.getElementById('c').textContent);this.textContent='Copiado!'">Copiar código</button>
+<p>Esse código vale por 10 minutos. Depois disso pode fechar esta aba.</p>
+</body></html>`);
   } catch (e) { s.status(500).send("Falha ao falar com o Roblox."); }
 });
 
