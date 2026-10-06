@@ -194,7 +194,10 @@ app.post("/api/promote", async (q, s) => {
       method: "PATCH", headers: { "x-api-key": KEY, "Content-Type": "application/json" },
       body: JSON.stringify({ role: `groups/${GROUP}/roles/${next.id}` })
     });
-    if (!r.ok) return s.json({ error: "O Roblox recusou a mudança de cargo." });
+    if (!r.ok) {
+      const detail = await r.text().catch(() => "");
+      return s.json({ error: `O Roblox recusou (status ${r.status}): ${detail.slice(0, 300)}` });
+    }
 
     s.json({ nick: t.name, from: cur.name, to: next.name });
   } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
