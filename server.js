@@ -64,6 +64,8 @@ app.use((q, s, n) => {
 });
 
 const sessions = new Map();   // token  -> { id, nick }
+const lastPromo = new Map();  // id do militar (Roblox) -> timestamp da última mudança de patente
+const COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const pending  = new Map();   // state  -> return URL (anti-CSRF do login)
 const oneTime  = new Map();   // authcode -> token (troca única depois do redirect)
 
@@ -190,6 +192,15 @@ app.post("/api/promote", async (q, s) => {
       if (mineIdx === -1 || mineIdx <= curIdx + 1) return s.json({ error: "Sua patente precisa ser maior que " + next.name + "." });
     }
 
+    // CEx, SGEx, Developer, Creator e Sub Creator não esperam o cooldown de 24h.
+    if (!meSuper) {
+      const last = lastPromo.get(String(t.id));
+      if (last && Date.now() - last < COOLDOWN_MS) {
+        const horasFaltam = Math.ceil((COOLDOWN_MS - (Date.now() - last)) / 3600000);
+        return s.json({ error: `CDP falta ${horasFaltam} horas` });
+      }
+    }
+
     const r = await fetch(`https://apis.roblox.com/cloud/v2/groups/${GROUP}/memberships/${t.id}`, {
       method: "PATCH", headers: { "x-api-key": KEY, "Content-Type": "application/json" },
       body: JSON.stringify({ role: `groups/${GROUP}/roles/${next.id}` })
@@ -199,6 +210,7 @@ app.post("/api/promote", async (q, s) => {
       return s.json({ error: `O Roblox recusou (status ${r.status}): ${detail.slice(0, 300)}` });
     }
 
+    lastPromo.set(String(t.id), Date.now());
     s.json({ nick: t.name, from: cur.name, to: next.name });
   } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
 });
