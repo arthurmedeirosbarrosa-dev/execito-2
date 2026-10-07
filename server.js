@@ -40,13 +40,34 @@ const LADDER = [
   { id: 715223052, name: "Subcomandante" },
   { id: 713051207, name: "Comandante" },
 ];
+// CDP (tempo de espera) para ser promovido AO cargo indicado, em horas.
+// Recruta não tem CDP. Os Oficiais Soberanos (Sub-Patriarca, Patriarca, Soberano) não entram
+// aqui: só poder total muda para eles, e poder total ignora o CDP.
+const CDP_HORAS = {
+  "Soldado": 1, "Cabo": 3,
+  "Terceiro Sargento": 6, "Segundo Sargento": 12, "Primeiro Sargento": 16,
+  "Subtenente": 22, "Cadete": 30,
+  "Aspirante à Oficial": 40, "Segundo Tenente": 52, "Primeiro Tenente": 66,
+  "Capitão": 84, "Major": 108, "Tenente Coronel": 138, "Coronel": 174,
+  "General de Brigada": 276, "General de Divisão": 348, "General de Exército": 432,
+};
+// Exigências manuais (o servidor não consegue verificar; o aviso aparece para quem promove).
+const CDP_NOTAS = {
+  "Subtenente": "Exige aprovação no exame de admissão da AMAN.",
+  "Cadete": "Exige patrulhamentos e participação em eventuais da AMAN.",
+};
+const fmtEspera = ms => {
+  const min = Math.ceil(ms / 60000), h = Math.floor(min / 60), m = min % 60;
+  return h ? (m ? `${h}h ${m}min` : `${h}h`) : `${m}min`;
+};
+
 // Teto da promoção automática (quem não tem poder total só sobe até aqui).
 const AUTO_TOP_NAME = "General de Exército";
 
 // Nicks do Roblox (minúsculo) de quem é CEx ou SGEx: podem promover OU rebaixar
 // qualquer militar para qualquer patente, menos a si mesmos. Edite esta lista à mão
 // sempre que alguém virar ou deixar de ser CEx/SGEx.
-const SUPER_USERS = ["tutu2345no"];
+const SUPER_USERS = ["tutu2345no", "guigui26799", "joelindo6", "ysodmdg"];
 // Além da lista acima, Creator e Sub Creator têm esse mesmo poder total automaticamente,
 // por serem cargo real do grupo no Roblox (nomes exatos, sem tag) — não precisa cadastrar nick.
 const SUPER_TAGS = ["Creator", "Sub Creator"];
@@ -65,7 +86,6 @@ app.use((q, s, n) => {
 
 const sessions = new Map();   // token  -> { id, nick }
 const lastPromo = new Map();  // id do militar (Roblox) -> timestamp da última mudança de patente
-const COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const pending  = new Map();   // state  -> return URL (anti-CSRF do login)
 const oneTime  = new Map();   // authcode -> token (troca única depois do redirect)
 
@@ -131,6 +151,27 @@ p{max-width:420px;margin:10px auto;line-height:1.5}</style></head><body>
   } catch (e) { s.status(500).send("Falha ao falar com o Roblox."); }
 });
 
+// Foto de perfil (headshot) do Roblox para um ID de usuário.
+async function avatar(id) {
+  try {
+    const d = await j(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${id}&size=150x150&format=Png&isCircular=false`);
+    return (d.data && d.data[0] && d.data[0].imageUrl) || null;
+  } catch (e) { return null; }
+}
+
+// Quanto falta de CDP para a PRÓXIMA promoção de quem está logado.
+// O servidor só sabe a data da última mudança feita por este painel (fica na memória).
+function cdpInfo(id, roleId, superUser) {
+  const idx = LADDER.findIndex(x => x.id === roleId);
+  const next = idx === -1 ? null : LADDER[idx + 1];
+  if (!next) return { proxima: null, restanteMs: 0, semRegistro: false };
+  const total = (CDP_HORAS[next.name] || 0) * 3600000;
+  const last = lastPromo.get(String(id));
+  if (superUser || !total) return { proxima: next.name, totalMs: total, restanteMs: 0, semRegistro: false };
+  if (!last) return { proxima: next.name, totalMs: total, restanteMs: 0, semRegistro: true };
+  return { proxima: next.name, totalMs: total, restanteMs: Math.max(0, total - (Date.now() - last)), semRegistro: false };
+}
+
 // 3) O site troca o código de uma única vez por nick + patente atual no grupo.
 app.get("/api/session", async (q, s) => {
   const session = oneTime.get(q.query.code);
@@ -139,11 +180,26 @@ app.get("/api/session", async (q, s) => {
   if (!me) return s.json({ error: "Login expirado, entre de novo." });
   const r = await role(me.id);
   if (!r) return s.json({ error: "Você não está no grupo do jogo." });
-  s.json({ token: session, nick: me.nick, label: r.name, isSuper: isSuper(me.nick, r.name) });
+  const sup = isSuper(me.nick, r.name);
+  s.json({ token: session, nick: me.nick, label: r.name, isSuper: sup,
+           avatar: await avatar(me.id), cdp: cdpInfo(me.id, r.id, sup) });
+});
+
+// Atualiza o cabeçalho (patente + CDP) sem precisar logar de novo. O site chama a cada ~30s.
+app.get("/api/me", async (q, s) => {
+  try {
+    const me = sessions.get(q.query.token);
+    if (!me) return s.json({ error: "Sessão inválida. Entre de novo." });
+    const r = await role(me.id);
+    if (!r) return s.json({ error: "Você não está no grupo do jogo." });
+    const sup = isSuper(me.nick, r.name);
+    s.json({ nick: me.nick, label: r.name, isSuper: sup, avatar: await avatar(me.id), cdp: cdpInfo(me.id, r.id, sup) });
+  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
 });
 
 // Lista pública das patentes do grupo, para preencher a lista de escolha do CEx/SGEx no site.
 app.get("/api/roles", (q, s) => s.json(LADDER));
+app.get("/api/cdp", (q, s) => s.json(CDP_HORAS));
 
 app.get("/auth/logout", (q, s) => s.redirect(q.query.return || SITE_ORIGIN));
 
@@ -192,12 +248,13 @@ app.post("/api/promote", async (q, s) => {
       if (mineIdx === -1 || mineIdx <= curIdx + 1) return s.json({ error: "Sua patente precisa ser maior que " + next.name + "." });
     }
 
-    // CEx, SGEx, Developer, Creator e Sub Creator não esperam o cooldown de 24h.
-    if (!meSuper) {
+    // Poder total (CEx, SGEx, Creator, Sub Creator) não espera CDP.
+    // Os demais esperam o CDP do cargo para o qual o militar está subindo.
+    const cdpMs = (CDP_HORAS[next.name] || 0) * 3600000;
+    if (!meSuper && cdpMs) {
       const last = lastPromo.get(String(t.id));
-      if (last && Date.now() - last < COOLDOWN_MS) {
-        const horasFaltam = Math.ceil((COOLDOWN_MS - (Date.now() - last)) / 3600000);
-        return s.json({ error: `CDP falta ${horasFaltam} horas` });
+      if (last && Date.now() - last < cdpMs) {
+        return s.json({ error: `CDP de ${next.name}: falta ${fmtEspera(cdpMs - (Date.now() - last))}` });
       }
     }
 
@@ -211,7 +268,7 @@ app.post("/api/promote", async (q, s) => {
     }
 
     lastPromo.set(String(t.id), Date.now());
-    s.json({ nick: t.name, from: cur.name, to: next.name });
+    s.json({ nick: t.name, from: cur.name, to: next.name, note: CDP_NOTAS[next.name] || null });
   } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
 });
 
