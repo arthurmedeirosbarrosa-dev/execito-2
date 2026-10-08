@@ -58,6 +58,29 @@ header{padding-left:68px}
 .tab{flex:none;text-align:left}
 [hidden]{display:none!important}
 </style>
+<style>
+:root:root:root{--bg:#0f1a0d;--panel:#1a2616;--ink:#e8ecdc;--mute:#9fae90;--line:#34422d;--green:#8fc480;--green2:#1a2616;--gold:#e0bd45;--err:#ff7a6b}
+body{background:radial-gradient(900px 420px at 85% -10%,#2f5d2a55,transparent),var(--bg);font-family:"Inter","Trebuchet MS",Verdana,sans-serif}
+header{background:transparent;border-bottom:3px solid var(--gold);padding:18px 16px 14px 68px}
+header h1{font-size:1.25rem;font-weight:800;text-transform:uppercase;letter-spacing:.3px}
+header p{color:var(--mute)}
+.card{background:var(--panel);border:1px solid var(--line);border-left:1px solid var(--line);border-radius:16px}
+button,:root:root #btnRblx{background:linear-gradient(180deg,#8fc480,#3f7a35);color:#0d140a;border-radius:10px}
+:root:root button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+input,select{background:#0d140a;border:1px solid var(--line);border-radius:10px;color:var(--ink)}
+#btnMenu{background:#1f3a1b;border:1px solid var(--gold);color:var(--gold)}
+.tabs{background:#141d10;border-right:1px solid var(--line)}
+:root:root .tab{background:transparent;border:1px solid transparent;color:#c4d1b4;border-radius:12px;padding:14px;font-weight:600}
+:root:root .tab[aria-selected="true"]{background:linear-gradient(90deg,#2f5d2a,#1f3a1b);border:1px solid #4a8a3c;color:#c9e8bc}
+.rank{border-color:var(--gold);color:var(--gold)}
+.eyebrow{margin:0;color:var(--gold);font:800 .72rem Verdana,sans-serif;letter-spacing:.3em}
+.menuTop{padding:4px 6px 14px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.menuTop strong{display:block;font-size:1.05rem}
+.menuTop span{color:var(--gold);font:700 .68rem Verdana,sans-serif;letter-spacing:.25em}
+.grp{font:700 .68rem Verdana,sans-serif;letter-spacing:.25em;color:#7d8c6e;margin:16px 6px 6px}
+#pRow{display:flex;gap:10px;align-items:stretch}#pRow input{flex:1;min-width:0}#pRow button{margin:0}
+#cdpBadge{background:var(--panel);border-color:var(--line)}
+</style>
 </head>
 <body>
 <div id="cdpBadge" hidden></div>
@@ -90,22 +113,26 @@ header{padding-left:68px}
   </div>
 
   <div class="tabs" role="tablist">
-    <button class="tab" role="tab" aria-selected="true" data-t="promo">Subir patente</button>
+    <div class="menuTop"><strong>Exército Brasileiro</strong><span>PAINEL DE PATENTES</span></div>
+    <div class="grp">PRINCIPAL</div>
+    <button class="tab" role="tab" aria-selected="true" data-t="promo">Promover</button>
     <button class="tab" role="tab" aria-selected="false" data-t="cdp">CDP</button>
+    <div class="grp">CONSULTA</div>
     <button class="tab" role="tab" aria-selected="false" data-t="hist">Histórico</button>
     <button class="tab" role="tab" aria-selected="false" data-t="efet">Efetivo</button>
-    <button class="tab" role="tab" aria-selected="false" data-t="ficha">Ficha</button>
+    <div class="grp">GESTÃO</div>
     <button class="tab" role="tab" aria-selected="false" data-t="trein">Treinos</button>
     <button class="tab" role="tab" aria-selected="false" data-t="ativ">Atividades</button>
     <button class="tab" role="tab" aria-selected="false" data-t="org">Organização</button>
+    <div class="grp" id="grpAdm" hidden>ADMINISTRAÇÃO</div>
     <button class="tab" role="tab" aria-selected="false" data-t="aud" id="tabAud" hidden>Auditoria</button>
     <button class="tab" role="tab" aria-selected="false" data-t="cfg" id="tabCfg" hidden>Config</button>
   </div>
 
   <section id="t-promo" class="card">
-    <h2>Subir patente</h2>
-    <label for="pNick">Nick do militar</label>
-    <input id="pNick" autocomplete="off" placeholder="Nick no Roblox">
+    <p class="eyebrow">PROMOVER</p>
+    <h2>Quem você vai promover hoje?</h2>
+    <div id="pRow"><input id="pNick" autocomplete="off" placeholder="Nick no Roblox"><button id="btnBusca">Buscar</button></div>
     <div id="pPrev" class="fh" style="margin-top:10px" hidden></div>
     <div id="superBox" hidden>
       <label for="pRole">Patente (CEx, SGEx, Criador e Sub Criador escolhem qualquer uma)</label>
@@ -144,28 +171,6 @@ header{padding-left:68px}
     <ul id="eList"></ul>
   </section>
 
-  <section id="t-ficha" class="card" hidden>
-    <h2>Ficha individual</h2>
-    <input id="fNick" autocomplete="off" placeholder="Nick do militar">
-    <button id="btnFicha">Abrir ficha</button>
-    <div id="fMsg" class="msg" hidden></div>
-    <div id="fBox" hidden>
-      <div class="fh" id="fHead" style="margin-top:14px"></div>
-      <div id="fEdit">
-        <label for="fEst">Estado</label>
-        <select id="fEst"><option>Ativo</option><option>Inativo</option><option>Licença</option></select>
-        <label for="fDiv">Divisão / companhia / pelotão</label>
-        <select id="fDiv"></select>
-        <label for="fTipo">Novo registro</label>
-        <select id="fTipo"><option>Punição</option><option>Medalha</option><option>Observação</option></select>
-        <input id="fTexto" placeholder="Descrição" style="margin-top:8px">
-        <button id="btnReg">Adicionar à ficha</button>
-      </div>
-      <h2 style="margin-top:18px">Punições, medalhas e observações</h2><ul id="fReg"></ul>
-      <h2 style="margin-top:18px">Promoções e rebaixamentos</h2><ul id="fPro"></ul>
-      <h2 style="margin-top:18px">Treinos e atividades</h2><p class="note" id="fAt"></p><ul id="fTr"></ul>
-    </div>
-  </section>
 
   <section id="t-trein" class="card" hidden>
     <h2>Treinos</h2>
@@ -276,7 +281,7 @@ $("menuBg").onclick=function(){menu(false)};
 function go(t){
   menu(false);
   document.querySelectorAll(".tab").forEach(function(x){x.setAttribute("aria-selected",x.dataset.t===t)});
-  ["promo","cdp","hist","efet","ficha","trein","ativ","org","aud","cfg"].forEach(function(x){$("t-"+x).hidden=(x!==t)});
+  ["promo","cdp","hist","efet","trein","ativ","org","aud","cfg"].forEach(function(x){$("t-"+x).hidden=(x!==t)});
   if(LOAD[t])LOAD[t]();
 }
 function act(p,b,m,ok){api(p,b).then(function(d){if(d.error){show($(m),d.error,1);return}$(m).hidden=true;if(ok)ok(d)}).catch(function(){show($(m),"Servidor indisponível.",1)})}
@@ -302,7 +307,8 @@ function prevLoad(){
     b.innerHTML=(d.avatar?'<img src="'+esc(d.avatar)+'" alt="">':"")+"<div><strong>"+esc(d.nick)+'</strong><br><span class="rank">'+esc(d.patente||"Fora do grupo")+"</span></div>";
   }).catch(function(){b.hidden=true});
 }
-$("pNick").oninput=function(){clearTimeout(prevT);prevT=setTimeout(prevLoad,700)};
+$("btnBusca").onclick=prevLoad;
+$("pNick").onkeydown=function(e){if(e.key==="Enter")prevLoad()};
 function efLoad(){api("/api/efetivo").then(function(d){
   if(d.error){show($("eMsg"),d.error,1);return}
   $("eMsg").hidden=true;EF=d;
@@ -320,25 +326,6 @@ function efDraw(){
   $("eList").innerHTML=l.slice(0,200).map(function(m){return'<li data-n="'+esc(m.nick)+'"><strong>'+esc(m.nick)+"</strong><small>"+esc(m.patente)+" · "+esc(m.estado)+(m.div?" · "+esc(m.div):"")+"</small></li>"}).join("");
 }
 ["eRank","eEst","eDiv"].forEach(function(i){$(i).onchange=efDraw});$("eQ").oninput=efDraw;
-$("eList").onclick=function(ev){var li=ev.target.closest("li");if(li){$("fNick").value=li.dataset.n;go("ficha");fichaLoad()}};
-function fichaLoad(){
-  var n=$("fNick").value.trim();if(!n)return;
-  api("/api/ficha?nick="+encodeURIComponent(n)).then(function(d){
-    if(d.error){show($("fMsg"),d.error,1);$("fBox").hidden=true;return}
-    $("fMsg").hidden=true;$("fBox").hidden=false;FN=d.nick;
-    $("fHead").innerHTML=(d.avatar?'<img src="'+esc(d.avatar)+'" alt="">':"")+"<div><strong>"+esc(d.nick)+'</strong><br><span class="rank">'+esc(d.patente||"—")+"</span></div>";
-    $("fEdit").hidden=!d.podeEditar;$("fEst").value=d.estado;
-    $("fDiv").innerHTML='<option value="">Sem unidade</option>'+d.orgs.map(function(o){return'<option value="'+esc(o.id)+'">'+esc(o.tipo+" "+o.nome)+"</option>"}).join("");$("fDiv").value=d.div;
-    $("fAt").textContent=d.atividades.n+" atividade(s) · "+d.atividades.min+" min no total";
-    $("fTr").innerHTML=d.treinos.map(function(x){return"<li>"+esc(x.titulo)+" · "+esc(x.status)+(x.nota?" ("+esc(x.nota)+")":"")+"<small>"+esc(x.data||"")+"</small></li>"}).join("")||"<li>Nenhum treino registrado.</li>";
-    $("fReg").innerHTML=d.registros.slice().reverse().map(function(x){return"<li><strong>"+esc(x.tipo)+"</strong>: "+esc(x.texto)+"<small>por "+esc(x.por)+" · "+dt(x.data)+"</small></li>"}).join("")||"<li>Nenhum registro.</li>";
-    $("fPro").innerHTML=d.promocoes.map(function(x){return"<li>"+esc(x.from)+" → "+esc(x.to)+"<small>por "+esc(x.by)+" · "+dt(x.date)+"</small></li>"}).join("")||"<li>Nenhuma mudança registrada pelo painel.</li>";
-  }).catch(function(){show($("fMsg"),"Servidor indisponível.",1)});
-}
-$("btnFicha").onclick=fichaLoad;
-$("fDiv").onchange=function(){act("/api/ficha",{target:FN,div:$("fDiv").value},"fMsg",function(){EF=[]})};
-$("fEst").onchange=function(){api("/api/ficha",{target:FN,estado:$("fEst").value}).then(function(d){if(d.error)show($("fMsg"),d.error,1);else{$("fMsg").hidden=true;EF=[];}})};
-$("btnReg").onclick=function(){api("/api/ficha",{target:FN,tipo:$("fTipo").value,texto:$("fTexto").value}).then(function(d){if(d.error){show($("fMsg"),d.error,1);return}$("fTexto").value="";fichaLoad()})};
 function audLoad(){api("/api/audit").then(function(d){
   if(d.error){show($("aMsg"),d.error,1);return}
   $("aMsg").hidden=true;
@@ -353,7 +340,7 @@ function render(){
   else $("av").textContent=DB.me.nick.charAt(0).toUpperCase();
   $("meNick").textContent=DB.me.nick;
   $("meRank").textContent=DB.me.label||RANKS[rankOf(DB.me.nick)];
-  $("tabAud").hidden=!DB.me.isSuper;$("tabCfg").hidden=!DB.me.isSuper;
+  $("tabAud").hidden=!DB.me.isSuper;$("grpAdm").hidden=!DB.me.isSuper;$("tabCfg").hidden=!DB.me.isSuper;
   $("superBox").hidden=!DB.me.isSuper;
   $("pTreinBox").hidden=!!DB.me.isSuper;
   if(DB.me.isSuper && !$("pRole").options.length){
