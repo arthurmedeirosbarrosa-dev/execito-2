@@ -59,20 +59,6 @@ header{padding-left:68px}
 [hidden]{display:none!important}
 </style>
 <style>
-:root:root:root{--bg:#0f1a0d;--panel:#1a2616;--ink:#e8ecdc;--mute:#9fae90;--line:#34422d;--green:#8fc480;--green2:#1a2616;--gold:#e0bd45;--err:#ff7a6b}
-body{background:radial-gradient(900px 420px at 85% -10%,#2f5d2a55,transparent),var(--bg);font-family:"Inter","Trebuchet MS",Verdana,sans-serif}
-header{background:transparent;border-bottom:3px solid var(--gold);padding:18px 16px 14px 68px}
-header h1{font-size:1.25rem;font-weight:800;text-transform:uppercase;letter-spacing:.3px}
-header p{color:var(--mute)}
-.card{background:var(--panel);border:1px solid var(--line);border-left:1px solid var(--line);border-radius:16px}
-button,:root:root #btnRblx{background:linear-gradient(180deg,#8fc480,#3f7a35);color:#0d140a;border-radius:10px}
-:root:root button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
-input,select{background:#0d140a;border:1px solid var(--line);border-radius:10px;color:var(--ink)}
-#btnMenu{background:#1f3a1b;border:1px solid var(--gold);color:var(--gold)}
-.tabs{background:#141d10;border-right:1px solid var(--line)}
-:root:root .tab{background:transparent;border:1px solid transparent;color:#c4d1b4;border-radius:12px;padding:14px;font-weight:600}
-:root:root .tab[aria-selected="true"]{background:linear-gradient(90deg,#2f5d2a,#1f3a1b);border:1px solid #4a8a3c;color:#c9e8bc}
-.rank{border-color:var(--gold);color:var(--gold)}
 .eyebrow{margin:0;color:var(--gold);font:800 .72rem Verdana,sans-serif;letter-spacing:.3em}
 .menuTop{padding:4px 6px 14px;border-bottom:1px solid var(--line);margin-bottom:6px}
 .menuTop strong{display:block;font-size:1.05rem}
@@ -96,7 +82,7 @@ input,select{background:#0d140a;border:1px solid var(--line);border-radius:10px;
 @keyframes introOut{to{opacity:0;visibility:hidden;pointer-events:none}}
 @media (prefers-reduced-motion:reduce){#intro{animation-delay:1.5s}.introBar i{animation-duration:.5s}}
 #pRow{display:flex;gap:10px;align-items:stretch}#pRow input{flex:1;min-width:0}#pRow button{margin:0}
-#cdpBadge{background:var(--panel);border-color:var(--line)}
+#intro{color:#e8ecdc;--gold:#e0bd45;--mute:#9fae90}
 </style>
 </head>
 <body>
@@ -109,9 +95,14 @@ input,select{background:#0d140a;border:1px solid var(--line);border-radius:10px;
   <div class="introCred">Créditos: <b>Mackijah</b></div>
 </div></div>
 <script>
-try{var I=document.getElementById("intro");
-if(sessionStorage.getItem("eb_intro"))I.style.display="none";
-else{sessionStorage.setItem("eb_intro","1");I.onclick=function(){I.style.display="none"}}}catch(e){}
+var I=document.getElementById("intro"),introHTML=I.innerHTML,introT;
+function showIntro(){try{
+  clearTimeout(introT);I.innerHTML=introHTML;
+  I.style.animation="none";void I.offsetWidth;I.style.animation="";I.style.display="grid";
+  I.onclick=function(){I.style.display="none"};
+  introT=setTimeout(function(){I.style.display="none"},4400);
+}catch(e){}}
+showIntro();
 </script>
 <div id="cdpBadge" hidden></div>
 <button id="btnMenu" aria-label="Abrir menu" hidden>&#9776;</button>
@@ -300,4 +291,19 @@ function api(p,body){
   var o={},u=API+p;
   if(body){o={method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({token:DB.me.token},body))}}
   else u+=(p.indexOf("?")<0?"?":"&")+"token="+encodeURIComponent(DB.me.token);
- 
+  return fetch(u,o).then(function(r){return r.json()});
+}
+function dt(i){return new Date(i).toLocaleString("pt-BR")}
+var EF=[],FN="";
+var LOAD={efet:function(){efLoad()},aud:function(){audLoad()},trein:function(){trLoad()},ativ:function(){atLoad()},org:function(){orgLoad()},cfg:function(){cfgLoad()}};
+function menu(abrir){document.querySelector(".tabs").classList.toggle("open",abrir);$("menuBg").hidden=!abrir}
+$("btnMenu").onclick=function(){menu(!document.querySelector(".tabs").classList.contains("open"))};
+$("menuBg").onclick=function(){menu(false)};
+function go(t){
+  menu(false);
+  document.querySelectorAll(".tab").forEach(function(x){x.setAttribute("aria-selected",x.dataset.t===t)});
+  ["promo","cdp","hist","efet","trein","ativ","org","aud","cfg"].forEach(function(x){$("t-"+x).hidden=(x!==t)});
+  if(LOAD[t])LOAD[t]();
+}
+function act(p,b,m,ok){api(p,b).then(function(d){if(d.error){show($(m),d.error,1);return}$(m).hidden=true;if(ok)ok(d)}).catch(function(){show($(m),"Servidor indisponível.",1)})}
+function lista(p,m,ul,fn,after){api(p).then(function(d){if(d.error){show($(m),d.error,1);return}$(m).hidden=true;$(ul).innerHTML=d.map(fn).join("")||"<li>Nada registrado ainda.</li>";if(after)after(d)}).cat
