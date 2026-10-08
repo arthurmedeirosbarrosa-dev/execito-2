@@ -135,7 +135,6 @@ app.get("/auth/start", (q, s) => {
   }).toString();
   s.redirect(url.toString());
 });
-
 // 2) O Roblox manda a pessoa de volta pra cá com um "code" de uso único. Em vez de tentar
 // redirecionar automaticamente de volta ao site (o que falha dentro da janela do Claude),
 // mostramos um código curto na tela para a pessoa colar manualmente no site.
@@ -366,5 +365,85 @@ app.post("/api/ficha", async (q, s) => {
     } else {
       const texto = String(q.body.texto || "").trim().slice(0, 300);
       if (!["Punição", "Medalha", "Observação"].includes(q.body.tipo) || !texto) return s.json({ error: "Preencha o tipo e o texto." });
-      f.registros.push({ tipo: q.body.tipo, texto, por: w.nick, data: new Date().to
-   app.listen(process.env.PORT || 3000);
+      f.registros.push({ tipo: q.body.tipo, texto, por: w.nick, data: new Date().toISOString() });
+      audit(q, w.nick, q.body.tipo, `${t.name}: ${texto}`);
+    }
+    persist(); s.json({ ok: true });
+  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
+});
+
+app.get("/api/audit", async (q, s) => {
+  try {
+    const w = await who(q); if (!w) return s.json(NOSESS);
+    if (!w.sup) return s.json({ error: "Só quem tem poder total vê a auditoria." });
+    s.json(db.audit.slice(-200).reverse());
+  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
+});
+
+// ================= Treinos, atividades, organização, config e sincronização =================
+const wrap = fn => async (q, s) => { try { const w = await who(q); if (!w) return s.json(NOSESS); await fn(q, s, w); } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); } };
+const NOPERM = { error: "Sem permissão para isso." };
+const txt = (v, n) => String(v || "").trim().slice(0, n);
+const id6 = () => crypto.randomBytes(4).toString("hex");
+
+app.get("/api/treinos", wrap((q, s) => s.json(db.treinos.slice(-50).reverse())));
+app.post("/api/treino", wrap((q, s, w) => {
+  if (!canEdit(w)) return s.json(NOPERM);
+  const titulo = txt(q.body.titulo, 80); if (!titulo) return s.json({ error: "Dê um título ao treino." });
+  db.treinos.push({ id: id6(), titulo, data: txt(q.body.data, 40), instrutor: txt(q.body.instrutor, 200), aux: txt(q.body.aux, 200), presencas: [], por: w.nick });
+  audit(q, w.nick, "Treino criado", titulo); s.json({ ok: true });
+}));
+app.post("/api/treino/marcar", wrap((q, s, w) => {
+  if (!canEdit(w)) return s.json(NOPERM);
+  const tr = db.treinos.find(x => x.id === q.body.id), nick = txt(q.body.nick, 30);
+  if (!tr || !nick || !["Presente", "Aprovado", "Reprovado", "Faltou"].includes(q.body.status)) return s.json({ error: "Escolha o treino, o nick e o status." });
+  tr.presencas = tr.presencas.filter(p => p.nick.toLowerCase() !== nick.toLowerCase());
+  tr.presencas.push({ nick, status: q.body.status, nota: txt(q.body.nota, 40) });
+  audit(q, w.nick, "Presença", `${nick}: ${q.body.status} em ${tr.titulo}`); s.json({ ok: true });
+}));
+
+app.get("/api/atividades", wrap((q, s) => s.json(db.atividades.slice(-50).reverse())));
+app.post("/api/atividade", wrap((q, s, w) => {
+  if (!canEdit(w)) return s.json(NOPERM);
+  const titulo = txt(q.body.titulo, 80), minutos = Math.round(Number(q.body.minutos));
+  const participantes = txt(q.body.participantes, 1000).split(",").map(x => x.trim()).filter(Boolean).slice(0, 50);
+  if (!titulo || !["Patrulha", "Missão", "Operação"].includes(q.body.tipo) || !(minutos > 0 && minutos <= 1440) || !participantes.length)
+    return s.json({ error: "Preencha tipo, título, duração (1 a 1440 min) e participantes separados por vírgula." });
+  db.atividades.push({ id: id6(), tipo: q.body.tipo, titulo, minutos, participantes, por: w.nick, data: new Date().toISOString() });
+  audit(q, w.nick, q.body.tipo, `${titulo} (${minutos} min, ${participantes.length} participantes)`); s.json({ ok: true });
+}));
+
+app.get("/api/orgs", wrap((q, s) => s.json(db.orgs)));
+app.post("/api/org", wrap((q, s, w) => {
+  if (!w.sup) return s.json(NOPERM);
+  if (q.body.apagar) { db.orgs = db.orgs.filter(o => o.id !== q.body.apagar); for (const k in db.fichas) if (db.fichas[k].div === q.body.apagar) db.fichas[k].div = ""; audit(q, w.nick, "Unidade apagada", q.body.apagar); return s.json({ ok: true }); }
+  const nome = txt(q.body.nome, 60);
+  if (!nome || !["Divisão", "Companhia", "Pelotão"].includes(q.body.tipo)) return s.json({ error: "Preencha o nome e o tipo." });
+  db.orgs.push({ id: id6(), nome, tipo: q.body.tipo, cmt: txt(q.body.cmt, 30), subcmt: txt(q.body.subcmt, 30) });
+  audit(q, w.nick, "Unidade criada", `${q.body.tipo} ${nome}`); s.json({ ok: true });
+}));
+
+// A chave da API e o ID do grupo ficam nas variáveis do Render (mais seguro); aqui só se vê o status.
+app.get("/api/config", wrap((q, s, w) => w.sup ? s.json({ webhook: !!db.config.webhook, group: GROUP, apiKey: !!KEY }) : s.json(NOPERM)));
+app.post("/api/config", wrap((q, s, w) => {
+  if (!w.sup) return s.json(NOPERM);
+  const u = txt(q.body.webhook, 300);
+  if (u && !/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//.test(u)) return s.json({ error: "Isso não parece um webhook do Discord." });
+  db.config.webhook = u; audit(q, w.nick, "Configuração", u ? "Webhook do Discord definido" : "Webhook do Discord removido"); s.json({ ok: true });
+}));
+
+// Sincronização: quem saiu do grupo vira Inativo e perde o CDP guardado. Roda sozinha a cada hora.
+async function syncGrupo(q, quem) {
+  const ids = new Set((await carregarGrupo(true)).map(m => String(m.id)));
+  let fora = 0;
+  for (const id in db.fichas) { const f = db.fichas[id];
+    if (!ids.has(id) && f.estado !== "Inativo") { f.estado = "Inativo"; f.registros.push({ tipo: "Observação", texto: "Saiu do grupo (sincronização).", por: "Sistema", data: new Date().toISOString() }); fora++; } }
+  for (const k of Object.keys(db.lastPromo)) if (!ids.has(k)) { delete db.lastPromo[k]; lastPromo.delete(k); }
+  persist(); if (fora) audit(q, quem, "Sincronização", `${fora} militar(es) fora do grupo marcados como Inativo`);
+  return { total: ids.size, fora };
+}
+setInterval(() => syncGrupo(null, "Sistema").catch(() => {}), 3600000);
+app.post("/api/sync", wrap(async (q, s, w) => w.sup ? s.json(await syncGrupo(q, w.nick)) : s.json(NOPERM)));
+
+app.listen(process.env.PORT || 3000);
+  
