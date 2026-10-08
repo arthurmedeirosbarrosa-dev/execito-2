@@ -120,11 +120,12 @@ header{padding-left:68px}
     <div id="pRow"><input id="pNick" autocomplete="off" placeholder="Nick no Roblox"><button id="btnBusca">Buscar</button></div>
     <div id="pPrev" class="fh" style="margin-top:10px" hidden></div>
     <div id="superBox" hidden>
-      <label for="pRole">Patente (CEx, SGEx, Criador e Sub Criador escolhem qualquer uma)</label>
+      <label for="pRole">Promoção atípica: escolha a patente (deixe como está para só subir uma)</label>
       <select id="pRole"></select>
     </div>
     <label class="chk" id="pTreinBox"><input type="checkbox" id="pTrein"> Confirmo que ele concluiu o treinamento</label>
     <button id="btnPromo">Promover</button>
+    <button class="ghost" id="btnRebx" hidden>Rebaixar</button>
     <div id="pMsg" class="msg" hidden></div>
   </section>
 
@@ -239,6 +240,7 @@ function cdpFetch(){
   .then(function(r){return r.json()}).then(function(d){
     if(d.error){$("cdpBadge").hidden=true;return}
     if(d.avatar){DB.me.avatar=d.avatar;$("av").innerHTML='<img src="'+esc(d.avatar)+'" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover">'}
+    if(d.perm)DB.me.perm=d.perm;
     if(d.label){DB.me.label=d.label;$("meRank").textContent=d.label}
     save();
     cdpData=d.cdp;cdpLeft=cdpData?cdpData.restanteMs:0;
@@ -278,5 +280,4 @@ function cfgLoad(){api("/api/config").then(function(d){if(d.error){show($("cfMsg
 $("btnTNew").onclick=function(){act("/api/treino",{titulo:$("tTit").value,data:$("tData").value,instrutor:$("tIns").value,aux:$("tAux").value},"tMsg",function(){$("tTit").value="";trLoad()})};
 $("btnTMark").onclick=function(){act("/api/treino/marcar",{id:$("tSel").value,nick:$("tNick").value,status:$("tSt").value,nota:$("tNota").value},"tMsg",function(){$("tNick").value="";$("tNota").value="";trLoad()})};
 $("btnANew").onclick=function(){act("/api/atividade",{tipo:$("aTipo").value,titulo:$("aTit").value,minutos:$("aMin").value,participantes:$("aPart").value},"atMsg",function(){$("aTit").value="";$("aMin").value="";$("aPart").value="";atLoad()})};
-$("btnONew").onclick=function(){act("/api/org",{tipo:$("oTipo").value,nome:$("oNome").value,cmt:$("oCmt").value,subcmt:$("oSub").value},"oMsg",function(){$("oNome").value="";orgLoad()})};
-$("oList").onclick=function(ev){var a=ev.target.closest("[data-del]");if(a){ev.preventDefault();i
+$("btnONew").onclick=function(){act("/api/org",{tipo:$("oTipo").value,nome:$("oNome").value,cmt:$("oCmt").value,subcmt:$("oSub").value},"oMsg",function(){$("oNome").value="";orgLoad
