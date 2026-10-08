@@ -366,3 +366,215 @@ app.post("/api/promote", async (q, s) => {
 
     lastPromo.set(String(t.id), Date.now());
     db.hist.push({ id: t.id, nick: t.name, from: cur.name, to: next.name, by: me.nick, date: new Date().toISOStri
+
+// A patente de quem promove vem da sessão (logada no Roblox), nunca do navegador.
+// body.toRoleId presente -> só usado se "me" tiver poder total (CEx, SGEx, CR ou SCR);
+// nesse caso pode escolher qualquer patente, inclusive para rebaixar. Sem isso, continua
+// a regra antiga: só sobe uma patente, e só se a patente de quem promove for maior.
+app.post("/api/promote", async (q, s) => {
+  try {
+    const me = sessions.get(q.body.token);
+    if (!me) return s.json({ error: "Sessão inválida. Entre de novo." });
+    const t = await user(q.body.target);
+    if (!t) return s.json({ error: "Militar não encontrado." });
+    if (t.id === me.id) return s.json({ error: "Você não pode promover a si mesmo." });
+
+    const [mine, cur] = await Promise.all([role(me.id), role(t.id)]);
+    if (!mine || !cur) return s.json({ error: "Os dois precisam estar no grupo." });
+
+    const meSuper = isSuper(me.nick, mine.name);
+    if (!meSuper && isSuper(t.name, cur.name)) return s.json({ error: "Você não pode alterar um membro da CEx." });
+    const perm = permDe(me.nick, mine.name);
+    const curIdx = LADDER.findIndex(x => x.id === cur.id);
+    if (LADDER.some(x => !x.id)) await resolverLadder();
+
+    let next, atipicaUsada = false;
+    if (q.body.toRoleId) { // promoção atípica: qualquer patente
+      if (!perm.atipica) return s.json({ error: "Você não tem acesso à promoção atípica." });
+      next = LADDER.find(x => String(x.id) === String(q.body.toRoleId));
+      if (!next) return s.json({ error: "Patente escolhida não existe." });
+      if (next.id === cur.id) return s.json({ error: "Esse militar já está nessa patente." });
+      if (ADM_ONLY.includes(next.name) && !perm.admin) return s.json({ error: next.name + " só a administração do exército (Fiscal para cima) entrega." });
+      atipicaUsada = true;
+    } else if (q.body.rebaixar) {
+      if (!perm.rebaixar) return s.json({ error: "Seu cargo não pode rebaixar." });
+      if (curIdx < 1) return s.json({ error: "Esse militar não pode ser rebaixado (já está na base ou fora da escada)." });
+      next = LADDER[curIdx - 1];
+    } else {
+      if (curIdx === -1) return s.json({ error: "Esse militar está num cargo fora da escada de patentes." });
+      next = LADDER[curIdx + 1];
+      if (!next) return s.json({ error: "Patente máxima da escada." });
+      if (!perm.teto) return s.json({ error: "Seu cargo não tem permissão para promover." });
+      const tetoIdx = LADDER.findIndex(x => x.name === perm.teto);
+      if (tetoIdx === -1 || curIdx + 1 > tetoIdx) return s.json({ error: `Seu cargo só promove até ${perm.teto}.` });
+    }
+    if (!next.id) return s.json({ error: `O cargo ${next.name} não foi encontrado no grupo do Roblox.` });
+
+    // Poder total (CEx, SGEx, Creator, Sub Creator) não espera CDP.
+    // Os demais esperam o CDP do cargo para o qual o militar está subindo.
+    const cdpMs = (CDP_HORAS[next.name] || 0) * 3600000;
+    if (!meSuper && !atipicaUsada && cdpMs) {
+      const last = lastPromo.get(String(t.id));
+      if (last && Date.now() - last < cdpMs) {
+        return s.json({ error: `CDP de ${next.name}: falta ${fmtEspera(cdpMs - (Date.now() - last))}` });
+      }
+    }
+
+    const r = await fetch(`https://apis.roblox.com/cloud/v2/groups/${GROUP}/memberships/${t.id}`, {
+      method: "PATCH", headers: { "x-api-key": KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ role: `groups/${GROUP}/roles/${next.id}` })
+    });
+    if (!r.ok) {
+      const detail = await r.text().catch(() => "");
+      return s.json({ error: `O Roblox recusou (status ${r.status}): ${detail.slice(0, 300)}` });
+    }
+
+    lastPromo.set(String(t.id), Date.now());
+    db.hist.push({ id: t.id, nick: t.name, from: cur.name, to: next.name, by: me.nick, date: new Date().toISOString() });
+    audit(q, me.nick, next.id === cur.id || LADDER.findIndex(x => x.id === next.id) > curIdx ? "Promoção" : "Rebaixamento", `${t.name}: ${cur.name} → ${next.name}`);
+    s.json({ nick: t.name, from: cur.name, to: next.name, note: CDP_NOTAS[next.name] || null });
+  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
+});
+
+// ================= Efetivo, ficha e auditoria =================
+// Permissões: ver o efetivo e as fichas = qualquer militar logado. Editar ficha = Capitão ou maior (ou poder total).
+// Ver a auditoria = só poder total.
+const EDIT_MIN = "Capitão";
+async function who(q) {
+  const me = sessions.get(q.query.token || (q.body && q.body.token));
+  if (!me) return null;
+  const r = await role(me.id);
+  if (!r) return null;
+  return { ...me, role: r, sup: isSuper(me.nick, r.name), idx: LADDER.findIndex(x => x.id === r.id) };
+}
+const canEdit = w => w.sup || w.idx >= LADDER.findIndex(x => x.name === EDIT_MIN);
+const NOSESS = { error: "Sessão inválida. Entre de novo." };
+
+let cache = { t: 0, list: [] };
+async function carregarGrupo(force) {
+  if (!force && Date.now() - cache.t < 300000) return cache.list; // atualiza a cada 5 min
+  const out = []; let c = "";
+  for (let i = 0; i < 15; i++) {
+    const d = await j(`https://groups.roblox.com/v1/groups/${GROUP}/users?limit=100&sortOrder=Asc${c ? "&cursor=" + c : ""}`);
+    (d.data || []).forEach(x => out.push({ id: x.user.userId, nick: x.user.username, patente: x.role.name, idx: LADDER.findIndex(l => l.id === x.role.id) }));
+    if (!d.nextPageCursor) break; c = d.nextPageCursor;
+  }
+  cache = { t: Date.now(), list: out }; return out;
+}
+const nomeOrg = id => (db.orgs.find(o => o.id === id) || {}).nome || "";
+app.get("/api/efetivo", async (q, s) => {
+  try {
+    if (!(await who(q))) return s.json(NOSESS);
+    const l = await carregarGrupo();
+    s.json(l.map(m => ({ ...m, estado: (db.fichas[m.id] || {}).estado || "Ativo", div: nomeOrg((db.fichas[m.id] || {}).div) })));
+  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
+});
+
+app.get("/api/ficha", async (q, s) => {
+  try {
+    const w = await who(q); if (!w) return s.json(NOSESS);
+    const t = await user(q.query.nick); if (!t) return s.json({ error: "Militar não encontrado." });
+    const r = await role(t.id), f = db.fichas[t.id] || { estado: "Ativo", registros: [] };
+    s.json({ nick: t.name, patente: r && r.name, avatar: await avatar(t.id), estado: f.estado, registros: f.registros,
+             promocoes: db.hist.filter(h => h.id === t.id).reverse(), podeEditar: canEdit(w), div: f.div || "", orgs: db.orgs,
+      treinos: db.treinos.map(tr => ({ ...(tr.presencas.find(p => p.nick.toLowerCase() === t.name.toLowerCase()) || {}), titulo: tr.titulo, data: tr.data })).filter(x => x.status),
+      atividades: (() => { const l = db.atividades.filter(a => a.participantes.some(p => p.toLowerCase() === t.name.toLowerCase())); return { n: l.length, min: l.reduce((z, a) => z + a.minutos, 0) }; })() });
+  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
+});
+
+app.post("/api/ficha", async (q, s) => {
+  try {
+    const w = await who(q); if (!w) return s.json(NOSESS);
+    if (!canEdit(w)) return s.json({ error: "Sem permissão: só " + EDIT_MIN + " ou maior edita fichas." });
+    const t = await user(q.body.target); if (!t) return s.json({ error: "Militar não encontrado." });
+    const f = db.fichas[t.id] || (db.fichas[t.id] = { estado: "Ativo", registros: [] });
+    if (q.body.div !== undefined) {
+      f.div = db.orgs.some(o => o.id === q.body.div) ? q.body.div : ""; audit(q, w.nick, "Organização", `${t.name} → ${nomeOrg(f.div) || "sem unidade"}`);
+    } else if (q.body.estado) {
+      if (!["Ativo", "Inativo", "Licença"].includes(q.body.estado)) return s.json({ error: "Estado inválido." });
+      f.estado = q.body.estado; audit(q, w.nick, "Estado", `${t.name} → ${f.estado}`);
+    } else {
+      const texto = String(q.body.texto || "").trim().slice(0, 300);
+      if (!["Punição", "Medalha", "Observação"].includes(q.body.tipo) || !texto) return s.json({ error: "Preencha o tipo e o texto." });
+      f.registros.push({ tipo: q.body.tipo, texto, por: w.nick, data: new Date().toISOString() });
+      audit(q, w.nick, q.body.tipo, `${t.name}: ${texto}`);
+    }
+    persist(); s.json({ ok: true });
+  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
+});
+
+app.get("/api/audit", async (q, s) => {
+  try {
+    const w = await who(q); if (!w) return s.json(NOSESS);
+    if (!w.sup) return s.json({ error: "Só quem tem poder total vê a auditoria." });
+    s.json(db.audit.slice(-200).reverse());
+  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
+});
+
+// ================= Treinos, atividades, organização, config e sincronização =================
+const wrap = fn => async (q, s) => { try { const w = await who(q); if (!w) return s.json(NOSESS); await fn(q, s, w); } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); } };
+const NOPERM = { error: "Sem permissão para isso." };
+const txt = (v, n) => String(v || "").trim().slice(0, n);
+const id6 = () => crypto.randomBytes(4).toString("hex");
+
+app.get("/api/treinos", wrap((q, s) => s.json(db.treinos.slice(-50).reverse())));
+app.post("/api/treino", wrap((q, s, w) => {
+  if (!canEdit(w)) return s.json(NOPERM);
+  const titulo = txt(q.body.titulo, 80); if (!titulo) return s.json({ error: "Dê um título ao treino." });
+  db.treinos.push({ id: id6(), titulo, data: txt(q.body.data, 40), instrutor: txt(q.body.instrutor, 200), aux: txt(q.body.aux, 200), presencas: [], por: w.nick });
+  audit(q, w.nick, "Treino criado", titulo); s.json({ ok: true });
+}));
+app.post("/api/treino/marcar", wrap((q, s, w) => {
+  if (!canEdit(w)) return s.json(NOPERM);
+  const tr = db.treinos.find(x => x.id === q.body.id), nick = txt(q.body.nick, 30);
+  if (!tr || !nick || !["Presente", "Aprovado", "Reprovado", "Faltou"].includes(q.body.status)) return s.json({ error: "Escolha o treino, o nick e o status." });
+  tr.presencas = tr.presencas.filter(p => p.nick.toLowerCase() !== nick.toLowerCase());
+  tr.presencas.push({ nick, status: q.body.status, nota: txt(q.body.nota, 40) });
+  audit(q, w.nick, "Presença", `${nick}: ${q.body.status} em ${tr.titulo}`); s.json({ ok: true });
+}));
+
+app.get("/api/atividades", wrap((q, s) => s.json(db.atividades.slice(-50).reverse())));
+app.post("/api/atividade", wrap((q, s, w) => {
+  if (!canEdit(w)) return s.json(NOPERM);
+  const titulo = txt(q.body.titulo, 80), minutos = Math.round(Number(q.body.minutos));
+  const participantes = txt(q.body.participantes, 1000).split(",").map(x => x.trim()).filter(Boolean).slice(0, 50);
+  if (!titulo || !["Patrulha", "Missão", "Operação"].includes(q.body.tipo) || !(minutos > 0 && minutos <= 1440) || !participantes.length)
+    return s.json({ error: "Preencha tipo, título, duração (1 a 1440 min) e participantes separados por vírgula." });
+  db.atividades.push({ id: id6(), tipo: q.body.tipo, titulo, minutos, participantes, por: w.nick, data: new Date().toISOString() });
+  audit(q, w.nick, q.body.tipo, `${titulo} (${minutos} min, ${participantes.length} participantes)`); s.json({ ok: true });
+}));
+
+app.get("/api/orgs", wrap((q, s) => s.json(db.orgs)));
+app.post("/api/org", wrap((q, s, w) => {
+  if (!w.sup) return s.json(NOPERM);
+  if (q.body.apagar) { db.orgs = db.orgs.filter(o => o.id !== q.body.apagar); for (const k in db.fichas) if (db.fichas[k].div === q.body.apagar) db.fichas[k].div = ""; audit(q, w.nick, "Unidade apagada", q.body.apagar); return s.json({ ok: true }); }
+  const nome = txt(q.body.nome, 60);
+  if (!nome || !["Divisão", "Companhia", "Pelotão"].includes(q.body.tipo)) return s.json({ error: "Preencha o nome e o tipo." });
+  db.orgs.push({ id: id6(), nome, tipo: q.body.tipo, cmt: txt(q.body.cmt, 30), subcmt: txt(q.body.subcmt, 30) });
+  audit(q, w.nick, "Unidade criada", `${q.body.tipo} ${nome}`); s.json({ ok: true });
+}));
+
+// A chave da API e o ID do grupo ficam nas variáveis do Render (mais seguro); aqui só se vê o status.
+app.get("/api/config", wrap((q, s, w) => w.sup ? s.json({ webhook: !!db.config.webhook, group: GROUP, apiKey: !!KEY }) : s.json(NOPERM)));
+app.post("/api/config", wrap((q, s, w) => {
+  if (!w.sup) return s.json(NOPERM);
+  const u = txt(q.body.webhook, 300);
+  if (u && !/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//.test(u)) return s.json({ error: "Isso não parece um webhook do Discord." });
+  db.config.webhook = u; audit(q, w.nick, "Configuração", u ? "Webhook do Discord definido" : "Webhook do Discord removido"); s.json({ ok: true });
+}));
+
+// Sincronização: quem saiu do grupo vira Inativo e perde o CDP guardado. Roda sozinha a cada hora.
+async function syncGrupo(q, quem) {
+  const ids = new Set((await carregarGrupo(true)).map(m => String(m.id)));
+  let fora = 0;
+  for (const id in db.fichas) { const f = db.fichas[id];
+    if (!ids.has(id) && f.estado !== "Inativo") { f.estado = "Inativo"; f.registros.push({ tipo: "Observação", texto: "Saiu do grupo (sincronização).", por: "Sistema", data: new Date().toISOString() }); fora++; } }
+  for (const k of Object.keys(db.lastPromo)) if (!ids.has(k)) { delete db.lastPromo[k]; lastPromo.delete(k); }
+  persist(); if (fora) audit(q, quem, "Sincronização", `${fora} militar(es) fora do grupo marcados como Inativo`);
+  return { total: ids.size, fora };
+}
+setInterval(() => syncGrupo(null, "Sistema").catch(() => {}), 3600000);
+app.post("/api/sync", wrap(async (q, s, w) => w.sup ? s.json(await syncGrupo(q, w.nick)) : s.json(NOPERM)));
+
+app.listen(process.env.PORT || 3000);
+      
