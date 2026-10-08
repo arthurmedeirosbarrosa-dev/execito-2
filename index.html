@@ -45,10 +45,16 @@ ul{list-style:none;margin:0;padding:0}
 li{padding:10px 0;border-bottom:1px solid var(--line);font-size:.95rem}
 li small{display:block;color:var(--mute)}
 .note{font-size:.85rem;color:var(--mute)}
+#cdpBadge{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:10px;z-index:9999;background:var(--panel);border:1px solid var(--gold);border-radius:8px;padding:7px 12px;font:.85rem "Trebuchet MS",Verdana,sans-serif;color:var(--ink);box-shadow:0 4px 14px rgba(0,0,0,.45)}
+#cdpBadge b{color:var(--gold)}
+#cdpBadge.ok b{color:var(--green)}
+.fh{display:flex;gap:12px;align-items:center}.fh img{width:56px;height:56px;border-radius:50%;border:2px solid var(--gold)}
+li[data-n]{cursor:pointer}
 [hidden]{display:none!important}
 </style>
 </head>
 <body>
+<div id="cdpBadge" hidden></div>
 <header>
   <h1>Exército Brasileiro · Painel de Patentes</h1>
   <p>Vincule sua conta Roblox, promova militares e registre o CDP.</p>
@@ -79,12 +85,20 @@ li small{display:block;color:var(--mute)}
     <button class="tab" role="tab" aria-selected="true" data-t="promo">Subir patente</button>
     <button class="tab" role="tab" aria-selected="false" data-t="cdp">CDP</button>
     <button class="tab" role="tab" aria-selected="false" data-t="hist">Histórico</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="efet">Efetivo</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="ficha">Ficha</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="trein">Treinos</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="ativ">Atividades</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="org">Organização</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="aud" id="tabAud" hidden>Auditoria</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="cfg" id="tabCfg" hidden>Config</button>
   </div>
 
   <section id="t-promo" class="card">
     <h2>Subir patente</h2>
     <label for="pNick">Nick do militar</label>
     <input id="pNick" autocomplete="off" placeholder="Nick no Roblox">
+    <div id="pPrev" class="fh" style="margin-top:10px" hidden></div>
     <div id="superBox" hidden>
       <label for="pRole">Patente (CEx, SGEx, Criador e Sub Criador escolhem qualquer uma)</label>
       <select id="pRole"></select>
@@ -110,6 +124,87 @@ li small{display:block;color:var(--mute)}
     <h2>Histórico de promoções</h2>
     <ul id="hList"></ul>
   </section>
+
+  <section id="t-efet" class="card" hidden>
+    <h2>Quadro de efetivo</h2>
+    <select id="eRank"><option value="">Todas as patentes</option></select>
+    <select id="eEst" style="margin-top:8px"><option value="">Todos os estados</option><option>Ativo</option><option>Inativo</option><option>Licença</option></select>
+    <select id="eDiv" style="margin-top:8px"><option value="">Todas as unidades</option></select>
+    <input id="eQ" placeholder="Buscar nick" style="margin-top:8px">
+    <div id="eMsg" class="msg" hidden></div>
+    <p class="note" id="eCount"></p>
+    <ul id="eList"></ul>
+  </section>
+
+  <section id="t-ficha" class="card" hidden>
+    <h2>Ficha individual</h2>
+    <input id="fNick" autocomplete="off" placeholder="Nick do militar">
+    <button id="btnFicha">Abrir ficha</button>
+    <div id="fMsg" class="msg" hidden></div>
+    <div id="fBox" hidden>
+      <div class="fh" id="fHead" style="margin-top:14px"></div>
+      <div id="fEdit">
+        <label for="fEst">Estado</label>
+        <select id="fEst"><option>Ativo</option><option>Inativo</option><option>Licença</option></select>
+        <label for="fDiv">Divisão / companhia / pelotão</label>
+        <select id="fDiv"></select>
+        <label for="fTipo">Novo registro</label>
+        <select id="fTipo"><option>Punição</option><option>Medalha</option><option>Observação</option></select>
+        <input id="fTexto" placeholder="Descrição" style="margin-top:8px">
+        <button id="btnReg">Adicionar à ficha</button>
+      </div>
+      <h2 style="margin-top:18px">Punições, medalhas e observações</h2><ul id="fReg"></ul>
+      <h2 style="margin-top:18px">Promoções e rebaixamentos</h2><ul id="fPro"></ul>
+      <h2 style="margin-top:18px">Treinos e atividades</h2><p class="note" id="fAt"></p><ul id="fTr"></ul>
+    </div>
+  </section>
+
+  <section id="t-trein" class="card" hidden>
+    <h2>Treinos</h2>
+    <input id="tTit" placeholder="Título do treino"><input id="tData" placeholder="Data e hora" style="margin-top:8px">
+    <input id="tIns" placeholder="Instrutor(es)" style="margin-top:8px"><input id="tAux" placeholder="Auxiliares" style="margin-top:8px">
+    <button id="btnTNew">Criar treino</button>
+    <label for="tSel">Lista de chamada</label><select id="tSel"></select>
+    <input id="tNick" placeholder="Nick do militar" style="margin-top:8px">
+    <select id="tSt" style="margin-top:8px"><option>Presente</option><option>Aprovado</option><option>Reprovado</option><option>Faltou</option></select>
+    <input id="tNota" placeholder="Nota (opcional)" style="margin-top:8px">
+    <button id="btnTMark">Registrar presença</button>
+    <div id="tMsg" class="msg" hidden></div><ul id="tList"></ul>
+  </section>
+
+  <section id="t-ativ" class="card" hidden>
+    <h2>Atividades</h2>
+    <select id="aTipo"><option>Patrulha</option><option>Missão</option><option>Operação</option></select>
+    <input id="aTit" placeholder="Título" style="margin-top:8px"><input id="aMin" type="number" placeholder="Duração em minutos" style="margin-top:8px">
+    <input id="aPart" placeholder="Participantes (nicks separados por vírgula)" style="margin-top:8px">
+    <button id="btnANew">Registrar atividade</button>
+    <div id="atMsg" class="msg" hidden></div><ul id="atList"></ul>
+  </section>
+
+  <section id="t-org" class="card" hidden>
+    <h2>Divisões, companhias e pelotões</h2>
+    <select id="oTipo"><option>Divisão</option><option>Companhia</option><option>Pelotão</option></select>
+    <input id="oNome" placeholder="Nome" style="margin-top:8px"><input id="oCmt" placeholder="Comandante (nick)" style="margin-top:8px"><input id="oSub" placeholder="Subcomandante (nick)" style="margin-top:8px">
+    <button id="btnONew">Criar unidade</button>
+    <p class="note">Só quem tem poder total cria ou apaga. Para colocar um militar numa unidade, use a aba Ficha.</p>
+    <div id="oMsg" class="msg" hidden></div><ul id="oList"></ul>
+  </section>
+
+  <section id="t-cfg" class="card" hidden>
+    <h2>Configurações</h2>
+    <p class="note" id="cInfo"></p>
+    <label for="cHook">Webhook do Discord (avisos de promoções, punições, treinos...)</label>
+    <input id="cHook" placeholder="https://discord.com/api/webhooks/..." autocomplete="off">
+    <button id="btnCHook">Salvar webhook</button>
+    <button class="ghost" id="btnSync">Sincronizar com o grupo agora</button>
+    <div id="cfMsg" class="msg" hidden></div>
+  </section>
+
+  <section id="t-aud" class="card" hidden>
+    <h2>Logs de auditoria</h2>
+    <div id="aMsg" class="msg" hidden></div>
+    <ul id="aList"></ul>
+  </section>
 </div>
 
 <p class="note" style="text-align:center">Jogo: Exército Brasileiro (Roblox) · protótipo do painel</p>
@@ -128,12 +223,125 @@ function rankOf(n){var u=DB.users[key(n)];return u?u.rank:0}
 function show(el,txt,err){el.hidden=false;el.textContent=txt;el.className="msg"+(err?" err":"")}
 function esc(s){return s.replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 
+/* ===== CDP no canto superior direito ===== */
+var cdpData=null,cdpLeft=0,cdpTick=null,cdpPoll=null;
+function cdpFmt(ms){
+  var t=Math.ceil(ms/1000),h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60;
+  return (h?h+"h ":"")+(h||m?m+"min ":"")+s+"s";
+}
+function cdpDraw(){
+  var b=$("cdpBadge");
+  if(!cdpData||!cdpData.proxima){b.className="ok";b.innerHTML="CDP: <b>patente máxima</b>";return}
+  if(cdpData.semRegistro||cdpLeft<=0){b.className="ok";b.innerHTML="CDP: <b>liberado</b>";return}
+  b.className="";b.innerHTML="CDP: falta <b>"+cdpFmt(cdpLeft)+"</b>";
+}
+function cdpFetch(){
+  if(!API||!DB.me||!DB.me.token)return;
+  fetch(API+"/api/me?token="+encodeURIComponent(DB.me.token))
+  .then(function(r){return r.json()}).then(function(d){
+    if(d.error){$("cdpBadge").hidden=true;return}
+    if(d.avatar){DB.me.avatar=d.avatar;$("av").innerHTML='<img src="'+esc(d.avatar)+'" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover">'}
+    if(d.label){DB.me.label=d.label;$("meRank").textContent=d.label}
+    save();
+    cdpData=d.cdp;cdpLeft=cdpData?cdpData.restanteMs:0;
+    cdpDraw();$("cdpBadge").hidden=false;
+    clearInterval(cdpTick);
+    cdpTick=setInterval(function(){if(cdpLeft>0){cdpLeft-=1000;cdpDraw()}},1000);
+  }).catch(function(){});
+}
+function cdpStart(){if(cdpPoll)return;cdpFetch();cdpPoll=setInterval(cdpFetch,60000)}
+function cdpStop(){clearInterval(cdpPoll);clearInterval(cdpTick);cdpPoll=null;$("cdpBadge").hidden=true}
+
+/* ===== Efetivo, ficha e auditoria ===== */
+function api(p,body){
+  var o={},u=API+p;
+  if(body){o={method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({token:DB.me.token},body))}}
+  else u+=(p.indexOf("?")<0?"?":"&")+"token="+encodeURIComponent(DB.me.token);
+  return fetch(u,o).then(function(r){return r.json()});
+}
+function dt(i){return new Date(i).toLocaleString("pt-BR")}
+var EF=[],FN="";
+var LOAD={efet:function(){efLoad()},aud:function(){audLoad()},trein:function(){trLoad()},ativ:function(){atLoad()},org:function(){orgLoad()},cfg:function(){cfgLoad()}};
+function go(t){
+  document.querySelectorAll(".tab").forEach(function(x){x.setAttribute("aria-selected",x.dataset.t===t)});
+  ["promo","cdp","hist","efet","ficha","trein","ativ","org","aud","cfg"].forEach(function(x){$("t-"+x).hidden=(x!==t)});
+  if(LOAD[t])LOAD[t]();
+}
+function act(p,b,m,ok){api(p,b).then(function(d){if(d.error){show($(m),d.error,1);return}$(m).hidden=true;if(ok)ok(d)}).catch(function(){show($(m),"Servidor indisponível.",1)})}
+function lista(p,m,ul,fn,after){api(p).then(function(d){if(d.error){show($(m),d.error,1);return}$(m).hidden=true;$(ul).innerHTML=d.map(fn).join("")||"<li>Nada registrado ainda.</li>";if(after)after(d)}).catch(function(){show($(m),"Servidor indisponível.",1)})}
+function trLoad(){lista("/api/treinos","tMsg","tList",function(x){return"<li><strong>"+esc(x.titulo)+"</strong> · "+esc(x.data)+"<small>Instrutor: "+esc(x.instrutor||"—")+" · Aux.: "+esc(x.aux||"—")+"</small><small>"+(x.presencas.map(function(p){return esc(p.nick)+" ("+esc(p.status)+(p.nota?", "+esc(p.nota):"")+")"}).join(", ")||"Sem chamada ainda")+"</small></li>"},function(d){$("tSel").innerHTML=d.map(function(x){return'<option value="'+esc(x.id)+'">'+esc(x.titulo)+"</option>"}).join("")})}
+function atLoad(){lista("/api/atividades","atMsg","atList",function(x){return"<li><strong>"+esc(x.tipo)+": "+esc(x.titulo)+"</strong> · "+x.minutos+" min<small>"+esc(x.participantes.join(", "))+" · por "+esc(x.por)+" · "+dt(x.data)+"</small></li>"})}
+function orgLoad(){lista("/api/orgs","oMsg","oList",function(x){return"<li><strong>"+esc(x.tipo)+" "+esc(x.nome)+"</strong><small>Cmt: "+esc(x.cmt||"—")+" · Subcmt: "+esc(x.subcmt||"—")+(DB.me.isSuper?' · <a href="#" data-del="'+esc(x.id)+'">apagar</a>':"")+"</small></li>"})}
+function cfgLoad(){api("/api/config").then(function(d){if(d.error){show($("cfMsg"),d.error,1);return}$("cInfo").textContent="Grupo: "+d.group+" · Chave da API: "+(d.apiKey?"configurada no Render":"FALTANDO no Render")+" · Webhook: "+(d.webhook?"definido":"não definido")+". O ID do grupo e a chave ficam nas variáveis do Render, por segurança."})}
+$("btnTNew").onclick=function(){act("/api/treino",{titulo:$("tTit").value,data:$("tData").value,instrutor:$("tIns").value,aux:$("tAux").value},"tMsg",function(){$("tTit").value="";trLoad()})};
+$("btnTMark").onclick=function(){act("/api/treino/marcar",{id:$("tSel").value,nick:$("tNick").value,status:$("tSt").value,nota:$("tNota").value},"tMsg",function(){$("tNick").value="";$("tNota").value="";trLoad()})};
+$("btnANew").onclick=function(){act("/api/atividade",{tipo:$("aTipo").value,titulo:$("aTit").value,minutos:$("aMin").value,participantes:$("aPart").value},"atMsg",function(){$("aTit").value="";$("aMin").value="";$("aPart").value="";atLoad()})};
+$("btnONew").onclick=function(){act("/api/org",{tipo:$("oTipo").value,nome:$("oNome").value,cmt:$("oCmt").value,subcmt:$("oSub").value},"oMsg",function(){$("oNome").value="";orgLoad()})};
+$("oList").onclick=function(ev){var a=ev.target.closest("[data-del]");if(a){ev.preventDefault();if(confirm("Apagar esta unidade?"))act("/api/org",{apagar:a.dataset.del},"oMsg",orgLoad)}};
+$("btnCHook").onclick=function(){act("/api/config",{webhook:$("cHook").value},"cfMsg",function(){$("cHook").value="";show($("cfMsg"),"Webhook salvo.");cfgLoad()})};
+$("btnSync").onclick=function(){act("/api/sync",{},"cfMsg",function(d){show($("cfMsg"),"Sincronizado: "+d.total+" no grupo, "+d.fora+" marcados como Inativo.")})};
+var prevT=null;
+function prevLoad(){
+  var n=$("pNick").value.trim(),b=$("pPrev");
+  if(!n){b.hidden=true;return}
+  api("/api/ficha?nick="+encodeURIComponent(n)).then(function(d){
+    b.hidden=false;
+    if(d.error){b.innerHTML='<span class="note">'+esc(d.error)+"</span>";return}
+    b.innerHTML=(d.avatar?'<img src="'+esc(d.avatar)+'" alt="">':"")+"<div><strong>"+esc(d.nick)+'</strong><br><span class="rank">'+esc(d.patente||"Fora do grupo")+"</span></div>";
+  }).catch(function(){b.hidden=true});
+}
+$("pNick").oninput=function(){clearTimeout(prevT);prevT=setTimeout(prevLoad,700)};
+function efLoad(){api("/api/efetivo").then(function(d){
+  if(d.error){show($("eMsg"),d.error,1);return}
+  $("eMsg").hidden=true;EF=d;
+  var nomes={};d.forEach(function(m){nomes[m.patente]=m.idx});
+  var cur=$("eRank").value;
+  $("eRank").innerHTML='<option value="">Todas as patentes</option>'+Object.keys(nomes).sort(function(a,b){return nomes[b]-nomes[a]}).map(function(n){return"<option>"+esc(n)+"</option>"}).join("");
+  $("eRank").value=cur;
+  var dv=$("eDiv").value,us={};d.forEach(function(m){if(m.div)us[m.div]=1});
+  $("eDiv").innerHTML='<option value="">Todas as unidades</option>'+Object.keys(us).sort().map(function(n){return"<option>"+esc(n)+"</option>"}).join("");$("eDiv").value=dv;efDraw();
+}).catch(function(){show($("eMsg"),"Servidor indisponível.",1)})}
+function efDraw(){
+  var r=$("eRank").value,e=$("eEst").value,dv=$("eDiv").value,q=$("eQ").value.toLowerCase();
+  var l=EF.filter(function(m){return(!r||m.patente===r)&&(!e||m.estado===e)&&(!dv||m.div===dv)&&(!q||m.nick.toLowerCase().indexOf(q)>-1)}).sort(function(a,b){return b.idx-a.idx});
+  $("eCount").textContent=l.length+" de "+EF.length+" militares";
+  $("eList").innerHTML=l.slice(0,200).map(function(m){return'<li data-n="'+esc(m.nick)+'"><strong>'+esc(m.nick)+"</strong><small>"+esc(m.patente)+" · "+esc(m.estado)+(m.div?" · "+esc(m.div):"")+"</small></li>"}).join("");
+}
+["eRank","eEst","eDiv"].forEach(function(i){$(i).onchange=efDraw});$("eQ").oninput=efDraw;
+$("eList").onclick=function(ev){var li=ev.target.closest("li");if(li){$("fNick").value=li.dataset.n;go("ficha");fichaLoad()}};
+function fichaLoad(){
+  var n=$("fNick").value.trim();if(!n)return;
+  api("/api/ficha?nick="+encodeURIComponent(n)).then(function(d){
+    if(d.error){show($("fMsg"),d.error,1);$("fBox").hidden=true;return}
+    $("fMsg").hidden=true;$("fBox").hidden=false;FN=d.nick;
+    $("fHead").innerHTML=(d.avatar?'<img src="'+esc(d.avatar)+'" alt="">':"")+"<div><strong>"+esc(d.nick)+'</strong><br><span class="rank">'+esc(d.patente||"—")+"</span></div>";
+    $("fEdit").hidden=!d.podeEditar;$("fEst").value=d.estado;
+    $("fDiv").innerHTML='<option value="">Sem unidade</option>'+d.orgs.map(function(o){return'<option value="'+esc(o.id)+'">'+esc(o.tipo+" "+o.nome)+"</option>"}).join("");$("fDiv").value=d.div;
+    $("fAt").textContent=d.atividades.n+" atividade(s) · "+d.atividades.min+" min no total";
+    $("fTr").innerHTML=d.treinos.map(function(x){return"<li>"+esc(x.titulo)+" · "+esc(x.status)+(x.nota?" ("+esc(x.nota)+")":"")+"<small>"+esc(x.data||"")+"</small></li>"}).join("")||"<li>Nenhum treino registrado.</li>";
+    $("fReg").innerHTML=d.registros.slice().reverse().map(function(x){return"<li><strong>"+esc(x.tipo)+"</strong>: "+esc(x.texto)+"<small>por "+esc(x.por)+" · "+dt(x.data)+"</small></li>"}).join("")||"<li>Nenhum registro.</li>";
+    $("fPro").innerHTML=d.promocoes.map(function(x){return"<li>"+esc(x.from)+" → "+esc(x.to)+"<small>por "+esc(x.by)+" · "+dt(x.date)+"</small></li>"}).join("")||"<li>Nenhuma mudança registrada pelo painel.</li>";
+  }).catch(function(){show($("fMsg"),"Servidor indisponível.",1)});
+}
+$("btnFicha").onclick=fichaLoad;
+$("fDiv").onchange=function(){act("/api/ficha",{target:FN,div:$("fDiv").value},"fMsg",function(){EF=[]})};
+$("fEst").onchange=function(){api("/api/ficha",{target:FN,estado:$("fEst").value}).then(function(d){if(d.error)show($("fMsg"),d.error,1);else{$("fMsg").hidden=true;EF=[];}})};
+$("btnReg").onclick=function(){api("/api/ficha",{target:FN,tipo:$("fTipo").value,texto:$("fTexto").value}).then(function(d){if(d.error){show($("fMsg"),d.error,1);return}$("fTexto").value="";fichaLoad()})};
+function audLoad(){api("/api/audit").then(function(d){
+  if(d.error){show($("aMsg"),d.error,1);return}
+  $("aMsg").hidden=true;
+  $("aList").innerHTML=d.map(function(x){return"<li><strong>"+esc(x.acao)+"</strong>: "+esc(x.detalhe)+"<small>"+esc(x.quem)+" · "+dt(x.data)+" · IP "+esc(x.ip)+"</small></li>"}).join("")||"<li>Sem registros.</li>";
+}).catch(function(){show($("aMsg"),"Servidor indisponível.",1)})}
+
 function render(){
   var on=!!DB.me;$("login").hidden=on;$("app").hidden=!on;
-  if(!on)return;
-  $("av").textContent=DB.me.nick.charAt(0).toUpperCase();
+  if(!on){cdpStop();return}
+  cdpStart();
+  if(DB.me.avatar)$("av").innerHTML='<img src="'+esc(DB.me.avatar)+'" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover">';
+  else $("av").textContent=DB.me.nick.charAt(0).toUpperCase();
   $("meNick").textContent=DB.me.nick;
   $("meRank").textContent=DB.me.label||RANKS[rankOf(DB.me.nick)];
+  $("tabAud").hidden=!DB.me.isSuper;$("tabCfg").hidden=!DB.me.isSuper;
   $("superBox").hidden=!DB.me.isSuper;
   $("pTreinBox").hidden=!!DB.me.isSuper;
   if(DB.me.isSuper && !$("pRole").options.length){
@@ -183,10 +391,7 @@ $("btnOut").onclick=function(){
   }).catch(function(){show($("lMsg"),"Servidor indisponível.",1)});
 })();
 
-document.querySelectorAll(".tab").forEach(function(b){b.onclick=function(){
-  document.querySelectorAll(".tab").forEach(function(x){x.setAttribute("aria-selected",x===b)});
-  ["promo","cdp","hist"].forEach(function(t){$("t-"+t).hidden=(t!==b.dataset.t)});
-}});
+document.querySelectorAll(".tab").forEach(function(b){b.onclick=function(){go(b.dataset.t)}});
 
 $("btnPromo").onclick=function(){
   var m=$("pMsg"),n=$("pNick").value.trim(),body={target:n,token:DB.me.token};
@@ -203,7 +408,7 @@ $("btnPromo").onclick=function(){
   .then(function(r){return r.json()}).then(function(d){
     if(d.error){show(m,d.error,1);return}
     DB.hist.push({nick:d.nick,from:d.from,to:d.to,by:DB.me.nick,date:new Date().toLocaleString("pt-BR")});
-    save();render();$("pTrein").checked=false;show(m,d.nick+" foi movido de "+d.from+" para "+d.to+".");
+    save();render();$("pTrein").checked=false;prevLoad();show(m,d.nick+" foi movido de "+d.from+" para "+d.to+"."+(d.note?" Atenção: "+d.note:""));
   }).catch(function(){show(m,"Servidor indisponível.",1)});
 };
 
