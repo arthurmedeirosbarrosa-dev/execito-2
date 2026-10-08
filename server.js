@@ -367,3 +367,4 @@ app.post("/api/ficha", async (q, s) => {
       const texto = String(q.body.texto || "").trim().slice(0, 300);
       if (!["Punição", "Medalha", "Observação"].includes(q.body.tipo) || !texto) return s.json({ error: "Preencha o tipo e o texto." });
       f.registros.push({ tipo: q.body.tipo, texto, por: w.nick, data: new Date().to
+   app.listen(process.env.PORT || 3000);
