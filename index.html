@@ -64,46 +64,10 @@ header{padding-left:68px}
 .menuTop strong{display:block;font-size:1.05rem}
 .menuTop span{color:var(--gold);font:700 .68rem Verdana,sans-serif;letter-spacing:.25em}
 .grp{font:700 .68rem Verdana,sans-serif;letter-spacing:.25em;color:#7d8c6e;margin:16px 6px 6px}
-#intro{position:fixed;inset:0;z-index:20000;display:grid;place-items:center;text-align:center;animation:introOut .6s ease 3.6s forwards}
-#intro{background:radial-gradient(700px 400px at 50% 40%,#2f5d2a77,transparent),#0a1108}
-.introBox{padding:24px;max-width:340px}
-.introStar{font-size:3.2rem;color:var(--gold);animation:pop 1s cubic-bezier(.2,1.4,.4,1) both,glow 2s ease-in-out 1s infinite}
-.introBox h1{margin:10px 0 2px;font-size:1.5rem;text-transform:uppercase;letter-spacing:.08em;animation:up .8s ease .4s both}
-.introBox p{margin:0;color:var(--gold);font:700 .72rem Verdana,sans-serif;letter-spacing:.3em;animation:up .8s ease .7s both}
-.introBar{height:6px;border-radius:99px;background:#ffffff1a;margin:26px 0 6px;overflow:hidden;animation:up .6s ease 1s both}
-.introBar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4a8a3c,var(--gold));animation:fill 2.2s ease-in-out 1.1s forwards}
-.introLoad{color:var(--mute);font:.75rem Verdana,sans-serif;animation:up .6s ease 1s both}
-.introCred{margin-top:28px;font:.9rem Verdana,sans-serif;color:var(--mute);animation:up .9s ease 2.4s both}
-.introCred b{color:var(--gold);font-size:1.15rem;letter-spacing:.08em}
-@keyframes up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-@keyframes pop{from{opacity:0;transform:scale(.2) rotate(-90deg)}to{opacity:1;transform:none}}
-@keyframes glow{50%{text-shadow:0 0 22px var(--gold)}}
-@keyframes fill{to{width:100%}}
-@keyframes introOut{to{opacity:0;visibility:hidden;pointer-events:none}}
-@media (prefers-reduced-motion:reduce){#intro{animation-delay:1.5s}.introBar i{animation-duration:.5s}}
 #pRow{display:flex;gap:10px;align-items:stretch}#pRow input{flex:1;min-width:0}#pRow button{margin:0}
-#intro{color:#e8ecdc;--gold:#e0bd45;--mute:#9fae90}
 </style>
 </head>
 <body>
-<div id="intro"><div class="introBox">
-  <div class="introStar">&#9733;</div>
-  <h1>Exército Brasileiro</h1>
-  <p>PAINEL DE PATENTES</p>
-  <div class="introBar"><i></i></div>
-  <div class="introLoad">Entrando no jogo...</div>
-  <div class="introCred">Créditos: <b>Mackijah</b></div>
-</div></div>
-<script>
-var I=document.getElementById("intro"),introHTML=I.innerHTML,introT;
-function showIntro(){try{
-  clearTimeout(introT);I.innerHTML=introHTML;
-  I.style.animation="none";void I.offsetWidth;I.style.animation="";I.style.display="grid";
-  I.onclick=function(){I.style.display="none"};
-  introT=setTimeout(function(){I.style.display="none"},4400);
-}catch(e){}}
-showIntro();
-</script>
 <div id="cdpBadge" hidden></div>
 <button id="btnMenu" aria-label="Abrir menu" hidden>&#9776;</button>
 <div id="menuBg" hidden></div>
@@ -306,4 +270,13 @@ function go(t){
   if(LOAD[t])LOAD[t]();
 }
 function act(p,b,m,ok){api(p,b).then(function(d){if(d.error){show($(m),d.error,1);return}$(m).hidden=true;if(ok)ok(d)}).catch(function(){show($(m),"Servidor indisponível.",1)})}
-function lista(p,m,ul,fn,after){api(p).then(function(d){if(d.error){show($(m),d.error,1);return}$(m).hidden=true;$(ul).innerHTML=d.map(fn).join("")||"<li>Nada registrado ainda.</li>";if(after)after(d)}).cat
+function lista(p,m,ul,fn,after){api(p).then(function(d){if(d.error){show($(m),d.error,1);return}$(m).hidden=true;$(ul).innerHTML=d.map(fn).join("")||"<li>Nada registrado ainda.</li>";if(after)after(d)}).catch(function(){show($(m),"Servidor indisponível.",1)})}
+function trLoad(){lista("/api/treinos","tMsg","tList",function(x){return"<li><strong>"+esc(x.titulo)+"</strong> · "+esc(x.data)+"<small>Instrutor: "+esc(x.instrutor||"—")+" · Aux.: "+esc(x.aux||"—")+"</small><small>"+(x.presencas.map(function(p){return esc(p.nick)+" ("+esc(p.status)+(p.nota?", "+esc(p.nota):"")+")"}).join(", ")||"Sem chamada ainda")+"</small></li>"},function(d){$("tSel").innerHTML=d.map(function(x){return'<option value="'+esc(x.id)+'">'+esc(x.titulo)+"</option>"}).join("")})}
+function atLoad(){lista("/api/atividades","atMsg","atList",function(x){return"<li><strong>"+esc(x.tipo)+": "+esc(x.titulo)+"</strong> · "+x.minutos+" min<small>"+esc(x.participantes.join(", "))+" · por "+esc(x.por)+" · "+dt(x.data)+"</small></li>"})}
+function orgLoad(){lista("/api/orgs","oMsg","oList",function(x){return"<li><strong>"+esc(x.tipo)+" "+esc(x.nome)+"</strong><small>Cmt: "+esc(x.cmt||"—")+" · Subcmt: "+esc(x.subcmt||"—")+(DB.me.isSuper?' · <a href="#" data-del="'+esc(x.id)+'">apagar</a>':"")+"</small></li>"})}
+function cfgLoad(){api("/api/config").then(function(d){if(d.error){show($("cfMsg"),d.error,1);return}$("cInfo").textContent="Grupo: "+d.group+" · Chave da API: "+(d.apiKey?"configurada no Render":"FALTANDO no Render")+" · Webhook: "+(d.webhook?"definido":"não definido")+". O ID do grupo e a chave ficam nas variáveis do Render, por segurança."})}
+$("btnTNew").onclick=function(){act("/api/treino",{titulo:$("tTit").value,data:$("tData").value,instrutor:$("tIns").value,aux:$("tAux").value},"tMsg",function(){$("tTit").value="";trLoad()})};
+$("btnTMark").onclick=function(){act("/api/treino/marcar",{id:$("tSel").value,nick:$("tNick").value,status:$("tSt").value,nota:$("tNota").value},"tMsg",function(){$("tNick").value="";$("tNota").value="";trLoad()})};
+$("btnANew").onclick=function(){act("/api/atividade",{tipo:$("aTipo").value,titulo:$("aTit").value,minutos:$("aMin").value,participantes:$("aPart").value},"atMsg",function(){$("aTit").value="";$("aMin").value="";$("aPart").value="";atLoad()})};
+$("btnONew").onclick=function(){act("/api/org",{tipo:$("oTipo").value,nome:$("oNome").value,cmt:$("oCmt").value,subcmt:$("oSub").value},"oMsg",function(){$("oNome").value="";orgLoad()})};
+$("oList").onclick=function(ev){var a=ev.target.closest("[data-del]");if(a){ev.preventDefault();i
