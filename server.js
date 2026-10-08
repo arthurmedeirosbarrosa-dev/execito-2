@@ -1,5 +1,7 @@
 // Servidor do painel — login oficial do Roblox (OAuth), igual ao Rover.
-// Requer Node 18+ e: npm i express
+// Requer Node 18+ e: npm i express pg
+//   DATABASE_URL (opcional) -> Postgres (ex.: Supabase/Neon/Render). Com ele, histórico, fichas, CDP e auditoria
+//   sobrevivem a reinícios. Sem ele, tudo funciona, mas fica só na memória.
 //
 // Variáveis de ambiente necessárias (configure no Render, aba "Environment"):
 //   ROBLOX_CLIENT_ID, ROBLOX_CLIENT_SECRET  -> criados em https://create.roblox.com/dashboard/credentials (aba OAuth 2.0)
@@ -88,6 +90,36 @@ const sessions = new Map();   // token  -> { id, nick }
 const lastPromo = new Map();  // id do militar (Roblox) -> timestamp da última mudança de patente
 const pending  = new Map();   // state  -> return URL (anti-CSRF do login)
 const oneTime  = new Map();   // authcode -> token (troca única depois do redirect)
+
+// ---- Armazenamento (Postgres se houver DATABASE_URL; senão só memória) ----
+const db = { lastPromo: {}, hist: [], fichas: {}, audit: [], treinos: [], atividades: [], orgs: [], config: {} };
+let pool = null, saving;
+(async () => {
+  try {
+    if (process.env.DATABASE_URL) {
+      const { Pool } = require("pg");
+      pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+      await pool.query("create table if not exists kv(k text primary key, v jsonb)");
+      const r = await pool.query("select v from kv where k='db'");
+      if (r.rows[0]) Object.assign(db, r.rows[0].v);
+    }
+  } catch (e) { console.log("Banco desligado:", e.message); }
+  for (const k in db.lastPromo) lastPromo.set(k, db.lastPromo[k]);
+})();
+function persist() {
+  db.lastPromo = Object.fromEntries(lastPromo);
+  clearTimeout(saving);
+  saving = setTimeout(() => pool && pool.query("insert into kv values('db',$1) on conflict (k) do update set v=$1", [JSON.stringify(db)]).catch(() => {}), 500);
+}
+// Auditoria: quem fez, o quê, quando e de qual IP.
+function audit(q, quem, acao, detalhe) {
+  const ip = q ? String(q.headers["x-forwarded-for"] || q.socket.remoteAddress || "").split(",")[0].trim() : "sistema";
+  if (db.config.webhook) fetch(db.config.webhook, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content: `**${acao}** — ${detalhe} (por ${quem})`.slice(0, 1900) }) }).catch(() => {});
+  db.audit.push({ quem, acao, detalhe, ip, data: new Date().toISOString() });
+  if (db.audit.length > 2000) db.audit.shift();
+  persist();
+}
 
 const j = (u, o) => fetch(u, o).then(r => r.json());
 
@@ -268,8 +300,70 @@ app.post("/api/promote", async (q, s) => {
     }
 
     lastPromo.set(String(t.id), Date.now());
+    db.hist.push({ id: t.id, nick: t.name, from: cur.name, to: next.name, by: me.nick, date: new Date().toISOString() });
+    audit(q, me.nick, next.id === cur.id || LADDER.findIndex(x => x.id === next.id) > curIdx ? "Promoção" : "Rebaixamento", `${t.name}: ${cur.name} → ${next.name}`);
     s.json({ nick: t.name, from: cur.name, to: next.name, note: CDP_NOTAS[next.name] || null });
   } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
 });
 
-app.listen(process.env.PORT || 3000);
+// ================= Efetivo, ficha e auditoria =================
+// Permissões: ver o efetivo e as fichas = qualquer militar logado. Editar ficha = Capitão ou maior (ou poder total).
+// Ver a auditoria = só poder total.
+const EDIT_MIN = "Capitão";
+async function who(q) {
+  const me = sessions.get(q.query.token || (q.body && q.body.token));
+  if (!me) return null;
+  const r = await role(me.id);
+  if (!r) return null;
+  return { ...me, role: r, sup: isSuper(me.nick, r.name), idx: LADDER.findIndex(x => x.id === r.id) };
+}
+const canEdit = w => w.sup || w.idx >= LADDER.findIndex(x => x.name === EDIT_MIN);
+const NOSESS = { error: "Sessão inválida. Entre de novo." };
+
+let cache = { t: 0, list: [] };
+async function carregarGrupo(force) {
+  if (!force && Date.now() - cache.t < 300000) return cache.list; // atualiza a cada 5 min
+  const out = []; let c = "";
+  for (let i = 0; i < 15; i++) {
+    const d = await j(`https://groups.roblox.com/v1/groups/${GROUP}/users?limit=100&sortOrder=Asc${c ? "&cursor=" + c : ""}`);
+    (d.data || []).forEach(x => out.push({ id: x.user.userId, nick: x.user.username, patente: x.role.name, idx: LADDER.findIndex(l => l.id === x.role.id) }));
+    if (!d.nextPageCursor) break; c = d.nextPageCursor;
+  }
+  cache = { t: Date.now(), list: out }; return out;
+}
+const nomeOrg = id => (db.orgs.find(o => o.id === id) || {}).nome || "";
+app.get("/api/efetivo", async (q, s) => {
+  try {
+    if (!(await who(q))) return s.json(NOSESS);
+    const l = await carregarGrupo();
+    s.json(l.map(m => ({ ...m, estado: (db.fichas[m.id] || {}).estado || "Ativo", div: nomeOrg((db.fichas[m.id] || {}).div) })));
+  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
+});
+
+app.get("/api/ficha", async (q, s) => {
+  try {
+    const w = await who(q); if (!w) return s.json(NOSESS);
+    const t = await user(q.query.nick); if (!t) return s.json({ error: "Militar não encontrado." });
+    const r = await role(t.id), f = db.fichas[t.id] || { estado: "Ativo", registros: [] };
+    s.json({ nick: t.name, patente: r && r.name, avatar: await avatar(t.id), estado: f.estado, registros: f.registros,
+             promocoes: db.hist.filter(h => h.id === t.id).reverse(), podeEditar: canEdit(w), div: f.div || "", orgs: db.orgs,
+      treinos: db.treinos.map(tr => ({ ...(tr.presencas.find(p => p.nick.toLowerCase() === t.name.toLowerCase()) || {}), titulo: tr.titulo, data: tr.data })).filter(x => x.status),
+      atividades: (() => { const l = db.atividades.filter(a => a.participantes.some(p => p.toLowerCase() === t.name.toLowerCase())); return { n: l.length, min: l.reduce((z, a) => z + a.minutos, 0) }; })() });
+  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
+});
+
+app.post("/api/ficha", async (q, s) => {
+  try {
+    const w = await who(q); if (!w) return s.json(NOSESS);
+    if (!canEdit(w)) return s.json({ error: "Sem permissão: só " + EDIT_MIN + " ou maior edita fichas." });
+    const t = await user(q.body.target); if (!t) return s.json({ error: "Militar não encontrado." });
+    const f = db.fichas[t.id] || (db.fichas[t.id] = { estado: "Ativo", registros: [] });
+    if (q.body.div !== undefined) {
+      f.div = db.orgs.some(o => o.id === q.body.div) ? q.body.div : ""; audit(q, w.nick, "Organização", `${t.name} → ${nomeOrg(f.div) || "sem unidade"}`);
+    } else if (q.body.estado) {
+      if (!["Ativo", "Inativo", "Licença"].includes(q.body.estado)) return s.json({ error: "Estado inválido." });
+      f.estado = q.body.estado; audit(q, w.nick, "Estado", `${t.name} → ${f.estado}`);
+    } else {
+      const texto = String(q.body.texto || "").trim().slice(0, 300);
+      if (!["Punição", "Medalha", "Observação"].includes(q.body.tipo) || !texto) return s.json({ error: "Preencha o tipo e o texto." });
+      f.registros.push({ tipo: q.body.tipo, texto, por: w.nick, data: new Date().to
