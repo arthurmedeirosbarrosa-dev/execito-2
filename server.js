@@ -261,7 +261,7 @@ async function resolverLadder() { // acha o ID dos cargos sem ID (Soberanos) pel
 }
 resolverLadder();
 
-// Teto: até qual patente cada faixa promove (a patente-alvo, não a de quem promove).
+//Teto: até qual patente cada faixa promove (a patente-alvo, não a de quem promove).
 const TETO = [
   { de: "Aspirante à Oficial", ate: "Coronel", teto: "Cadete" },                // Oficiais Subalternos a Superiores
   { de: "General de Brigada", ate: "General de Exército", teto: "Coronel" },     // Oficiais Generais
@@ -301,71 +301,6 @@ function permDe(nick, roleName) {
     acoes: sup ? ["advertir", "anular", "rebaixar", "exilar", "blacklist"] : (g ? g.acoes : []),
   };
 }
-
-// A patente de quem promove vem da sessão (logada no Roblox), nunca do navegador.
-// body.toRoleId presente -> só usado se "me" tiver poder total (CEx, SGEx, CR ou SCR);
-// nesse caso pode escolher qualquer patente, inclusive para rebaixar. Sem isso, continua
-// a regra antiga: só sobe uma patente, e só se a patente de quem promove for maior.
-app.post("/api/promote", async (q, s) => {
-  try {
-    const me = sessions.get(q.body.token);
-    if (!me) return s.json({ error: "Sessão inválida. Entre de novo." });
-    const t = await user(q.body.target);
-    if (!t) return s.json({ error: "Militar não encontrado." });
-    if (t.id === me.id) return s.json({ error: "Você não pode promover a si mesmo." });
-
-    const [mine, cur] = await Promise.all([role(me.id), role(t.id)]);
-    if (!mine || !cur) return s.json({ error: "Os dois precisam estar no grupo." });
-
-    const meSuper = isSuper(me.nick, mine.name);
-    if (!meSuper && isSuper(t.name, cur.name)) return s.json({ error: "Você não pode alterar um membro da CEx." });
-    const perm = permDe(me.nick, mine.name);
-    const curIdx = LADDER.findIndex(x => x.id === cur.id);
-    if (LADDER.some(x => !x.id)) await resolverLadder();
-
-    let next, atipicaUsada = false;
-    if (q.body.toRoleId) { // promoção atípica: qualquer patente
-      if (!perm.atipica) return s.json({ error: "Você não tem acesso à promoção atípica." });
-      next = LADDER.find(x => String(x.id) === String(q.body.toRoleId));
-      if (!next) return s.json({ error: "Patente escolhida não existe." });
-      if (next.id === cur.id) return s.json({ error: "Esse militar já está nessa patente." });
-      if (ADM_ONLY.includes(next.name) && !perm.admin) return s.json({ error: next.name + " só a administração do exército (Fiscal para cima) entrega." });
-      atipicaUsada = true;
-    } else if (q.body.rebaixar) {
-      if (!perm.rebaixar) return s.json({ error: "Seu cargo não pode rebaixar." });
-      if (curIdx < 1) return s.json({ error: "Esse militar não pode ser rebaixado (já está na base ou fora da escada)." });
-      next = LADDER[curIdx - 1];
-    } else {
-      if (curIdx === -1) return s.json({ error: "Esse militar está num cargo fora da escada de patentes." });
-      next = LADDER[curIdx + 1];
-      if (!next) return s.json({ error: "Patente máxima da escada." });
-      if (!perm.teto) return s.json({ error: "Seu cargo não tem permissão para promover." });
-      const tetoIdx = LADDER.findIndex(x => x.name === perm.teto);
-      if (tetoIdx === -1 || curIdx + 1 > tetoIdx) return s.json({ error: `Seu cargo só promove até ${perm.teto}.` });
-    }
-    if (!next.id) return s.json({ error: `O cargo ${next.name} não foi encontrado no grupo do Roblox.` });
-
-    // Poder total (CEx, SGEx, Creator, Sub Creator) não espera CDP.
-    // Os demais esperam o CDP do cargo para o qual o militar está subindo.
-    const cdpMs = (CDP_HORAS[next.name] || 0) * 3600000;
-    if (!meSuper && !atipicaUsada && cdpMs) {
-      const last = lastPromo.get(String(t.id));
-      if (last && Date.now() - last < cdpMs) {
-        return s.json({ error: `CDP de ${next.name}: falta ${fmtEspera(cdpMs - (Date.now() - last))}` });
-      }
-    }
-
-    const r = await fetch(`https://apis.roblox.com/cloud/v2/groups/${GROUP}/memberships/${t.id}`, {
-      method: "PATCH", headers: { "x-api-key": KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ role: `groups/${GROUP}/roles/${next.id}` })
-    });
-    if (!r.ok) {
-      const detail = await r.text().catch(() => "");
-      return s.json({ error: `O Roblox recusou (status ${r.status}): ${detail.slice(0, 300)}` });
-    }
-
-    lastPromo.set(String(t.id), Date.now());
-    db.hist.push({ id: t.id, nick: t.name, from: cur.name, to: next.name, by: me.nick, date: new Date().toISOStri
 
 // A patente de quem promove vem da sessão (logada no Roblox), nunca do navegador.
 // body.toRoleId presente -> só usado se "me" tiver poder total (CEx, SGEx, CR ou SCR);
@@ -577,4 +512,3 @@ setInterval(() => syncGrupo(null, "Sistema").catch(() => {}), 3600000);
 app.post("/api/sync", wrap(async (q, s, w) => w.sup ? s.json(await syncGrupo(q, w.nick)) : s.json(NOPERM)));
 
 app.listen(process.env.PORT || 3000);
-      
