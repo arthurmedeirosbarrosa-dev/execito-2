@@ -78,11 +78,41 @@ input,select{background:#0d140a;border:1px solid var(--line);border-radius:10px;
 .menuTop strong{display:block;font-size:1.05rem}
 .menuTop span{color:var(--gold);font:700 .68rem Verdana,sans-serif;letter-spacing:.25em}
 .grp{font:700 .68rem Verdana,sans-serif;letter-spacing:.25em;color:#7d8c6e;margin:16px 6px 6px}
+#intro{position:fixed;inset:0;z-index:20000;display:grid;place-items:center;text-align:center;animation:introOut .6s ease 3.6s forwards}
+#intro{background:radial-gradient(700px 400px at 50% 40%,#2f5d2a77,transparent),#0a1108}
+.introBox{padding:24px;max-width:340px}
+.introStar{font-size:3.2rem;color:var(--gold);animation:pop 1s cubic-bezier(.2,1.4,.4,1) both,glow 2s ease-in-out 1s infinite}
+.introBox h1{margin:10px 0 2px;font-size:1.5rem;text-transform:uppercase;letter-spacing:.08em;animation:up .8s ease .4s both}
+.introBox p{margin:0;color:var(--gold);font:700 .72rem Verdana,sans-serif;letter-spacing:.3em;animation:up .8s ease .7s both}
+.introBar{height:6px;border-radius:99px;background:#ffffff1a;margin:26px 0 6px;overflow:hidden;animation:up .6s ease 1s both}
+.introBar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4a8a3c,var(--gold));animation:fill 2.2s ease-in-out 1.1s forwards}
+.introLoad{color:var(--mute);font:.75rem Verdana,sans-serif;animation:up .6s ease 1s both}
+.introCred{margin-top:28px;font:.9rem Verdana,sans-serif;color:var(--mute);animation:up .9s ease 2.4s both}
+.introCred b{color:var(--gold);font-size:1.15rem;letter-spacing:.08em}
+@keyframes up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.2) rotate(-90deg)}to{opacity:1;transform:none}}
+@keyframes glow{50%{text-shadow:0 0 22px var(--gold)}}
+@keyframes fill{to{width:100%}}
+@keyframes introOut{to{opacity:0;visibility:hidden;pointer-events:none}}
+@media (prefers-reduced-motion:reduce){#intro{animation-delay:1.5s}.introBar i{animation-duration:.5s}}
 #pRow{display:flex;gap:10px;align-items:stretch}#pRow input{flex:1;min-width:0}#pRow button{margin:0}
 #cdpBadge{background:var(--panel);border-color:var(--line)}
 </style>
 </head>
 <body>
+<div id="intro"><div class="introBox">
+  <div class="introStar">&#9733;</div>
+  <h1>Exército Brasileiro</h1>
+  <p>PAINEL DE PATENTES</p>
+  <div class="introBar"><i></i></div>
+  <div class="introLoad">Entrando no jogo...</div>
+  <div class="introCred">Créditos: <b>Mackijah</b></div>
+</div></div>
+<script>
+try{var I=document.getElementById("intro");
+if(sessionStorage.getItem("eb_intro"))I.style.display="none";
+else{sessionStorage.setItem("eb_intro","1");I.onclick=function(){I.style.display="none"}}}catch(e){}
+</script>
 <div id="cdpBadge" hidden></div>
 <button id="btnMenu" aria-label="Abrir menu" hidden>&#9776;</button>
 <div id="menuBg" hidden></div>
@@ -220,7 +250,7 @@ input,select{background:#0d140a;border:1px solid var(--line);border-radius:10px;
   </section>
 </div>
 
-<p class="note" style="text-align:center">Jogo: Exército Brasileiro (Roblox) · protótipo do painel</p>
+<p class="note" style="text-align:center">Jogo: Exército Brasileiro (Roblox) · protótipo do painel · Créditos: Mackijah</p>
 </main>
 
 <script>
@@ -270,158 +300,4 @@ function api(p,body){
   var o={},u=API+p;
   if(body){o={method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({token:DB.me.token},body))}}
   else u+=(p.indexOf("?")<0?"?":"&")+"token="+encodeURIComponent(DB.me.token);
-  return fetch(u,o).then(function(r){return r.json()});
-}
-function dt(i){return new Date(i).toLocaleString("pt-BR")}
-var EF=[],FN="";
-var LOAD={efet:function(){efLoad()},aud:function(){audLoad()},trein:function(){trLoad()},ativ:function(){atLoad()},org:function(){orgLoad()},cfg:function(){cfgLoad()}};
-function menu(abrir){document.querySelector(".tabs").classList.toggle("open",abrir);$("menuBg").hidden=!abrir}
-$("btnMenu").onclick=function(){menu(!document.querySelector(".tabs").classList.contains("open"))};
-$("menuBg").onclick=function(){menu(false)};
-function go(t){
-  menu(false);
-  document.querySelectorAll(".tab").forEach(function(x){x.setAttribute("aria-selected",x.dataset.t===t)});
-  ["promo","cdp","hist","efet","trein","ativ","org","aud","cfg"].forEach(function(x){$("t-"+x).hidden=(x!==t)});
-  if(LOAD[t])LOAD[t]();
-}
-function act(p,b,m,ok){api(p,b).then(function(d){if(d.error){show($(m),d.error,1);return}$(m).hidden=true;if(ok)ok(d)}).catch(function(){show($(m),"Servidor indisponível.",1)})}
-function lista(p,m,ul,fn,after){api(p).then(function(d){if(d.error){show($(m),d.error,1);return}$(m).hidden=true;$(ul).innerHTML=d.map(fn).join("")||"<li>Nada registrado ainda.</li>";if(after)after(d)}).catch(function(){show($(m),"Servidor indisponível.",1)})}
-function trLoad(){lista("/api/treinos","tMsg","tList",function(x){return"<li><strong>"+esc(x.titulo)+"</strong> · "+esc(x.data)+"<small>Instrutor: "+esc(x.instrutor||"—")+" · Aux.: "+esc(x.aux||"—")+"</small><small>"+(x.presencas.map(function(p){return esc(p.nick)+" ("+esc(p.status)+(p.nota?", "+esc(p.nota):"")+")"}).join(", ")||"Sem chamada ainda")+"</small></li>"},function(d){$("tSel").innerHTML=d.map(function(x){return'<option value="'+esc(x.id)+'">'+esc(x.titulo)+"</option>"}).join("")})}
-function atLoad(){lista("/api/atividades","atMsg","atList",function(x){return"<li><strong>"+esc(x.tipo)+": "+esc(x.titulo)+"</strong> · "+x.minutos+" min<small>"+esc(x.participantes.join(", "))+" · por "+esc(x.por)+" · "+dt(x.data)+"</small></li>"})}
-function orgLoad(){lista("/api/orgs","oMsg","oList",function(x){return"<li><strong>"+esc(x.tipo)+" "+esc(x.nome)+"</strong><small>Cmt: "+esc(x.cmt||"—")+" · Subcmt: "+esc(x.subcmt||"—")+(DB.me.isSuper?' · <a href="#" data-del="'+esc(x.id)+'">apagar</a>':"")+"</small></li>"})}
-function cfgLoad(){api("/api/config").then(function(d){if(d.error){show($("cfMsg"),d.error,1);return}$("cInfo").textContent="Grupo: "+d.group+" · Chave da API: "+(d.apiKey?"configurada no Render":"FALTANDO no Render")+" · Webhook: "+(d.webhook?"definido":"não definido")+". O ID do grupo e a chave ficam nas variáveis do Render, por segurança."})}
-$("btnTNew").onclick=function(){act("/api/treino",{titulo:$("tTit").value,data:$("tData").value,instrutor:$("tIns").value,aux:$("tAux").value},"tMsg",function(){$("tTit").value="";trLoad()})};
-$("btnTMark").onclick=function(){act("/api/treino/marcar",{id:$("tSel").value,nick:$("tNick").value,status:$("tSt").value,nota:$("tNota").value},"tMsg",function(){$("tNick").value="";$("tNota").value="";trLoad()})};
-$("btnANew").onclick=function(){act("/api/atividade",{tipo:$("aTipo").value,titulo:$("aTit").value,minutos:$("aMin").value,participantes:$("aPart").value},"atMsg",function(){$("aTit").value="";$("aMin").value="";$("aPart").value="";atLoad()})};
-$("btnONew").onclick=function(){act("/api/org",{tipo:$("oTipo").value,nome:$("oNome").value,cmt:$("oCmt").value,subcmt:$("oSub").value},"oMsg",function(){$("oNome").value="";orgLoad()})};
-$("oList").onclick=function(ev){var a=ev.target.closest("[data-del]");if(a){ev.preventDefault();if(confirm("Apagar esta unidade?"))act("/api/org",{apagar:a.dataset.del},"oMsg",orgLoad)}};
-$("btnCHook").onclick=function(){act("/api/config",{webhook:$("cHook").value},"cfMsg",function(){$("cHook").value="";show($("cfMsg"),"Webhook salvo.");cfgLoad()})};
-$("btnSync").onclick=function(){act("/api/sync",{},"cfMsg",function(d){show($("cfMsg"),"Sincronizado: "+d.total+" no grupo, "+d.fora+" marcados como Inativo.")})};
-var prevT=null;
-function prevLoad(){
-  var n=$("pNick").value.trim(),b=$("pPrev");
-  if(!n){b.hidden=true;return}
-  api("/api/ficha?nick="+encodeURIComponent(n)).then(function(d){
-    b.hidden=false;
-    if(d.error){b.innerHTML='<span class="note">'+esc(d.error)+"</span>";return}
-    b.innerHTML=(d.avatar?'<img src="'+esc(d.avatar)+'" alt="">':"")+"<div><strong>"+esc(d.nick)+'</strong><br><span class="rank">'+esc(d.patente||"Fora do grupo")+"</span></div>";
-  }).catch(function(){b.hidden=true});
-}
-$("btnBusca").onclick=prevLoad;
-$("pNick").onkeydown=function(e){if(e.key==="Enter")prevLoad()};
-function efLoad(){api("/api/efetivo").then(function(d){
-  if(d.error){show($("eMsg"),d.error,1);return}
-  $("eMsg").hidden=true;EF=d;
-  var nomes={};d.forEach(function(m){nomes[m.patente]=m.idx});
-  var cur=$("eRank").value;
-  $("eRank").innerHTML='<option value="">Todas as patentes</option>'+Object.keys(nomes).sort(function(a,b){return nomes[b]-nomes[a]}).map(function(n){return"<option>"+esc(n)+"</option>"}).join("");
-  $("eRank").value=cur;
-  var dv=$("eDiv").value,us={};d.forEach(function(m){if(m.div)us[m.div]=1});
-  $("eDiv").innerHTML='<option value="">Todas as unidades</option>'+Object.keys(us).sort().map(function(n){return"<option>"+esc(n)+"</option>"}).join("");$("eDiv").value=dv;efDraw();
-}).catch(function(){show($("eMsg"),"Servidor indisponível.",1)})}
-function efDraw(){
-  var r=$("eRank").value,e=$("eEst").value,dv=$("eDiv").value,q=$("eQ").value.toLowerCase();
-  var l=EF.filter(function(m){return(!r||m.patente===r)&&(!e||m.estado===e)&&(!dv||m.div===dv)&&(!q||m.nick.toLowerCase().indexOf(q)>-1)}).sort(function(a,b){return b.idx-a.idx});
-  $("eCount").textContent=l.length+" de "+EF.length+" militares";
-  $("eList").innerHTML=l.slice(0,200).map(function(m){return'<li data-n="'+esc(m.nick)+'"><strong>'+esc(m.nick)+"</strong><small>"+esc(m.patente)+" · "+esc(m.estado)+(m.div?" · "+esc(m.div):"")+"</small></li>"}).join("");
-}
-["eRank","eEst","eDiv"].forEach(function(i){$(i).onchange=efDraw});$("eQ").oninput=efDraw;
-function audLoad(){api("/api/audit").then(function(d){
-  if(d.error){show($("aMsg"),d.error,1);return}
-  $("aMsg").hidden=true;
-  $("aList").innerHTML=d.map(function(x){return"<li><strong>"+esc(x.acao)+"</strong>: "+esc(x.detalhe)+"<small>"+esc(x.quem)+" · "+dt(x.data)+" · IP "+esc(x.ip)+"</small></li>"}).join("")||"<li>Sem registros.</li>";
-}).catch(function(){show($("aMsg"),"Servidor indisponível.",1)})}
-
-function render(){
-  var on=!!DB.me;$("login").hidden=on;$("app").hidden=!on;$("btnMenu").hidden=!on;
-  if(!on){cdpStop();return}
-  cdpStart();
-  if(DB.me.avatar)$("av").innerHTML='<img src="'+esc(DB.me.avatar)+'" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover">';
-  else $("av").textContent=DB.me.nick.charAt(0).toUpperCase();
-  $("meNick").textContent=DB.me.nick;
-  $("meRank").textContent=DB.me.label||RANKS[rankOf(DB.me.nick)];
-  $("tabAud").hidden=!DB.me.isSuper;$("grpAdm").hidden=!DB.me.isSuper;$("tabCfg").hidden=!DB.me.isSuper;
-  $("superBox").hidden=!DB.me.isSuper;
-  $("pTreinBox").hidden=!!DB.me.isSuper;
-  if(DB.me.isSuper && !$("pRole").options.length){
-    fetch(API+"/api/roles").then(function(r){return r.json()}).then(function(list){
-      $("pRole").innerHTML=list.map(function(x){return'<option value="'+x.id+'">'+esc(x.name)+'</option>'}).join("");
-    });
-  }
-  var h=DB.hist.slice().reverse().map(function(x){return"<li><strong>"+esc(x.nick)+"</strong>: "+x.from+" → "+x.to+"<small>por "+esc(x.by)+" · "+x.date+"</small></li>"}).join("");
-  $("hList").innerHTML=h||"<li>Nenhuma promoção ainda.</li>";
-  var c=Object.keys(DB.cdp).map(function(k){var x=DB.cdp[k];return"<li><strong>"+esc(x.nick)+"</strong>"+(x.obs?" · "+esc(x.obs):"")+"<small>registrado por "+esc(x.by)+" · "+x.date+"</small></li>"}).join("");
-  $("cList").innerHTML=c||"<li>Nenhum CDP registrado.</li>";
-}
-
-if(!API){
-  $("noApi").hidden=false;
-  $("btnRblx").setAttribute("aria-disabled","true");
-  $("btnRblx").removeAttribute("href");
-  $("codeBox").hidden=true;
-}else{
-  // Link direto (não é um clique por JS) para a tela oficial do Roblox, que abre em nova aba:
-  // assim o navegador sai de verdade do sandbox do chat sem ser bloqueado pela política de segurança.
-  $("btnRblx").href=API+"/auth/start";
-}
-$("btnCode").onclick=function(){
-  var code=$("authcode").value.trim(),m=$("lMsg");
-  if(!code){show(m,"Cole o código que apareceu depois do login no Roblox.",1);return}
-  fetch(API+"/api/session?code="+encodeURIComponent(code))
-  .then(function(r){return r.json()}).then(function(d){
-    if(d.error){show(m,d.error,1);return}
-    DB.me={nick:d.nick,token:d.token,label:d.label,isSuper:!!d.isSuper};save();render();
-  }).catch(function(){show(m,"Servidor indisponível.",1)});
-};
-$("btnOut").onclick=function(){
-  DB.me=null;save();
-  if(API){location.href=API+"/auth/logout?return="+encodeURIComponent(location.origin+location.pathname)}
-  else render();
-};
-// Volta do login do Roblox: a URL traz um código de uma única vez para trocar por nick+patente
-(function(){
-  var p=new URLSearchParams(location.search),code=p.get("authcode");
-  if(!code||!API)return;
-  history.replaceState(null,"",location.pathname);
-  fetch(API+"/api/session?code="+encodeURIComponent(code))
-  .then(function(r){return r.json()}).then(function(d){
-    if(d.error){show($("lMsg"),d.error,1);return}
-    DB.me={nick:d.nick,token:d.token,label:d.label,isSuper:!!d.isSuper};save();render();
-  }).catch(function(){show($("lMsg"),"Servidor indisponível.",1)});
-})();
-
-document.querySelectorAll(".tab").forEach(function(b){b.onclick=function(){go(b.dataset.t)}});
-
-$("btnPromo").onclick=function(){
-  var m=$("pMsg"),n=$("pNick").value.trim(),body={target:n,token:DB.me.token};
-  if(!n){show(m,"Digite o nick do militar.",1);return}
-  if(DB.me.isSuper){
-    body.toRoleId=$("pRole").value;
-  } else if(!$("pTrein").checked){
-    show(m,"Confirme que ele concluiu o treinamento.",1);return;
-  }
-  // A patente de quem promove e do alvo são checadas pelo servidor direto no grupo do Roblox,
-  // nunca por um valor vindo do navegador. Só quem tem poder total (CEx, SGEx, Criador, Sub
-  // Criador) consegue escolher uma patente livremente; os demais só sobem uma patente.
-  fetch(API+"/api/promote",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
-  .then(function(r){return r.json()}).then(function(d){
-    if(d.error){show(m,d.error,1);return}
-    DB.hist.push({nick:d.nick,from:d.from,to:d.to,by:DB.me.nick,date:new Date().toLocaleString("pt-BR")});
-    save();render();$("pTrein").checked=false;prevLoad();show(m,d.nick+" foi movido de "+d.from+" para "+d.to+"."+(d.note?" Atenção: "+d.note:""));
-  }).catch(function(){show(m,"Servidor indisponível.",1)});
-};
-
-$("btnCdp").onclick=function(){
-  var m=$("cMsg"),n=$("cNick").value.trim();
-  if(!n){show(m,"Digite o nick do militar.",1);return}
-  if(DB.cdp[key(n)]){show(m,n+" já tem CDP registrado.",1);return}
-  if(!DB.users[key(n)])DB.users[key(n)]={nick:n,rank:0};
-  DB.cdp[key(n)]={nick:n,obs:$("cObs").value.trim(),by:DB.me.nick,date:new Date().toLocaleString("pt-BR")};
-  save();render();$("cObs").value="";
-  show(m,"CDP de "+n+" registrado.");
-};
-
-load();render();
-</script>
-</body>
-</html>
+ 
