@@ -91,6 +91,12 @@ app.use((q, s, n) => {
 
 const sessions = new Map();   // token  -> { id, nick }
 const lastPromo = new Map();  // id do militar (Roblox) -> timestamp da última mudança de patente
+// Endereço do site. Se FRONTEND_URL estiver apontando para o claude.ai (versão antiga), ignora e usa o GitHub Pages.
+const SITE = (SITE_ORIGIN && !/claude\./i.test(SITE_ORIGIN)) ? SITE_ORIGIN : "https://arthurmedeirosbarrosa-dev.github.io/execito-2/";
+// "state" do login assinado (HMAC): continua válido mesmo se o Render reiniciar no meio do login.
+const firmar = v => crypto.createHmac("sha256", String(CSECRET || "yso-state")).update(v).digest("hex").slice(0, 24);
+const novoState = () => { const v = Date.now().toString(36) + "." + crypto.randomBytes(6).toString("hex"); return v + "." + firmar(v); };
+const stateOk = st => { const p = String(st || "").split("."); return p.length === 3 && firmar(p[0] + "." + p[1]) === p[2] && Date.now() - parseInt(p[0], 36) < 30 * 60000; };
 const pending  = new Map();   // state  -> return URL (anti-CSRF do login)
 const oneTime  = new Map();   // authcode -> token (troca única depois do redirect)
 
@@ -128,9 +134,7 @@ const j = (u, o) => fetch(u, o).then(r => r.json());
 
 // 1) Manda a pessoa para a tela OFICIAL do Roblox. A senha é digitada lá, nunca no nosso site.
 app.get("/auth/start", (q, s) => {
-  const state = crypto.randomUUID();
-  pending.set(state, true);
-  setTimeout(() => pending.delete(state), 10 * 60000);
+  const state = novoState();
   const url = new URL("https://apis.roblox.com/oauth/v1/authorize");
   url.search = new URLSearchParams({
     client_id: CID, redirect_uri: REDIRECT_URI, scope: "openid profile",
@@ -147,12 +151,11 @@ const aviso = msg => `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf
 <style>html,body{margin:0;min-height:100%;background:#04080a;color:#dff7ea;font-family:system-ui,sans-serif}body{display:grid;place-items:center;min-height:100vh;text-align:center;padding:24px}
 .c{max-width:380px;border:1px solid #15382c;border-radius:14px;padding:26px;background:#0a1411;box-shadow:0 0 30px rgba(57,255,136,.12)}h2{color:#39ff88;letter-spacing:.1em;text-transform:uppercase;margin:0 0 10px}
 a{display:inline-block;margin-top:16px;padding:11px 18px;border:1px solid #39ff88;border-radius:8px;color:#39ff88;text-decoration:none;font-weight:700}</style></head>
-<body><div class="c"><h2>Yso System</h2><p>${msg}</p><a href="${SITE_ORIGIN || "https://arthurmedeirosbarrosa-dev.github.io/execito-2/"}">Voltar ao site</a></div></body></html>`;
+<body><div class="c"><h2>Yso System</h2><p>${msg}</p><a href="${SITE}">Voltar ao site</a></div></body></html>`;
 app.get("/auth/callback", async (q, s) => {
   try {
     const { code, state } = q.query;
-    if (!pending.has(state)) return s.status(400).send(aviso("Login expirado. Volte ao site e tente de novo."));
-    pending.delete(state);
+    if (!stateOk(state)) return s.status(400).send(aviso("Login expirado. Volte ao site e tente de novo."));
 
     const tok = await j("https://apis.roblox.com/oauth/v1/token", {
       method: "POST",
@@ -175,8 +178,8 @@ app.get("/auth/callback", async (q, s) => {
     oneTime.set(authcode, session);
     setTimeout(() => oneTime.delete(authcode), 10 * 60000); // expira em 10 min se não for usado
 
-    //Volta direto para o site, já logado (sem pedir código).
-    const volta = new URL(SITE_ORIGIN || "https://arthurmedeirosbarrosa-dev.github.io/execito-2/");
+    // Volta direto para o site, já logado (sem pedir código).
+    const volta = new URL(SITE);
     volta.searchParams.set("authcode", authcode);
     s.redirect(volta.toString());
   } catch (e) { s.status(500).send(aviso("Falha ao falar com o Roblox. Tente de novo em instantes.")); }
@@ -232,7 +235,7 @@ app.get("/api/me", async (q, s) => {
 app.get("/api/roles", (q, s) => s.json(LADDER.filter(x => x.id)));
 app.get("/api/cdp", (q, s) => s.json(CDP_HORAS));
 
-app.get("/auth/logout", (q, s) => s.redirect(q.query.return || SITE_ORIGIN));
+app.get("/auth/logout", (q, s) => s.redirect(/^https:\/\/[^\/]*github\.io\//.test(q.query.return || "") ? q.query.return : SITE));
 
 async function user(nick) {
   const d = await j("https://users.roblox.com/v1/usernames/users", {
