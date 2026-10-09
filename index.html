@@ -3,241 +3,349 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Exército Brasileiro RBLX · Painel de Patentes</title>
+<title>Yso System</title>
 <style>
-:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
---bg:#eef0e6;--panel:#fff;--ink:#1f2a1a;--mute:#5d6b52;--line:#cdd3bd;--green:#2f5d2a;--green2:#1f4019;--gold:#c9a227;--err:#a12a1f}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141a11;--panel:#1d2619;--ink:#e8ecdc;--mute:#9fae90;--line:#34422d;--green:#6aa55c;--green2:#8fc480;--gold:#e0bd45;--err:#ff8b7d}}
-:root[data-theme="dark"]{--bg:#141a11;--panel:#1d2619;--ink:#e8ecdc;--mute:#9fae90;--line:#34422d;--green:#6aa55c;--green2:#8fc480;--gold:#e0bd45;--err:#ff8b7d}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
+:root{--neon:#39ff88;--bg:#04080a;--panel:#0a1411;--line:#15382c;--ink:#dff7ea;--mute:#6f9b88;--err:#ff6b6b;box-sizing:border-box}
 *,*:before,*:after{box-sizing:inherit}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Georgia,"Times New Roman",serif}
-h1,h2,h3,button,label,input,select,.tab{font-family:"Trebuchet MS",Verdana,sans-serif}
-header{background:var(--green2);color:#fff;padding:22px 16px;border-bottom:6px solid var(--gold)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) header{background:#0d140a}}
-header h1{margin:0;font-size:1.5rem;letter-spacing:.5px}
-header p{margin:4px 0 0;opacity:.85;font-size:.95rem}
-main{max-width:760px;margin:0 auto;padding:16px}
-.card{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--green);border-radius:4px;padding:16px;margin-bottom:16px}
-h2{margin:0 0 10px;font-size:1.15rem}
-label{display:block;font-size:.9rem;color:var(--mute);margin:10px 0 4px}
-input,select{width:100%;padding:11px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);font-size:1rem}
-button{padding:11px 16px;border:0;border-radius:4px;background:var(--green);color:#fff;font-size:1rem;font-weight:700;cursor:pointer;margin-top:12px}
-:root:not([data-theme="light"]) button{color:#0d140a}
-button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
-#btnRblx{padding:11px 16px;border-radius:4px;background:var(--green);color:#fff;font-size:1rem;font-weight:700;margin-top:12px}
-#btnRblx[aria-disabled="true"]{opacity:.5;pointer-events:none}
-:root:not([data-theme="light"]) #btnRblx{color:#0d140a}
-button:focus-visible,input:focus-visible,select:focus-visible,.tab:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
-.tabs{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto}
-.tab{flex:1;white-space:nowrap;padding:11px;background:var(--panel);border:1px solid var(--line);border-radius:4px;color:var(--ink);font-weight:700;margin:0}
-.tab[aria-selected="true"]{background:var(--green);color:#fff;border-color:var(--green)}
-:root:not([data-theme="light"]) .tab[aria-selected="true"]{color:#0d140a}
-.me{display:flex;align-items:center;gap:12px}
-.av{width:48px;height:48px;border-radius:50%;background:var(--green);color:#fff;display:grid;place-items:center;font:700 1.3rem Verdana,sans-serif;flex:none}
-:root:not([data-theme="light"]) .av{color:#0d140a}
-.rank{display:inline-block;padding:2px 10px;border:1px solid var(--gold);border-radius:99px;font:700 .85rem Verdana,sans-serif}
-.msg{margin-top:12px;padding:10px;border-radius:4px;background:var(--bg);border:1px solid var(--line)}
+html{scroll-padding-top:env(safe-area-inset-top,0px);background:#04080a;color-scheme:dark}
+body{margin:0;color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,sans-serif;background:var(--bg) linear-gradient(rgba(57,255,136,.04) 1px,transparent 1px) 0 0/100% 38px,linear-gradient(90deg,rgba(57,255,136,.04) 1px,transparent 1px) 0 0/38px 100%;min-height:100vh}
+h1,h2,h3{margin:0;letter-spacing:.06em;text-transform:uppercase}
+h2{font-size:1rem;color:var(--neon);margin-bottom:12px}
+.mono,label,.tag,.kv span,.tabbar button{font-family:ui-monospace,Menlo,Consolas,monospace}
+label{display:block;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:12px 0 5px}
+input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:#050c0a;color:var(--ink);font:inherit}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--neon);box-shadow:0 0 0 3px rgba(57,255,136,.15)}
+textarea{min-height:110px;resize:vertical}
+button{padding:11px 18px;border:1px solid var(--neon);border-radius:8px;background:rgba(57,255,136,.12);color:var(--neon);font:700 .85rem ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;margin-top:12px}
+button:hover{background:var(--neon);color:#021008;box-shadow:0 0 18px rgba(57,255,136,.45)}
+a.btn{display:inline-block;margin-top:14px;padding:12px 20px;border:1px solid var(--neon);border-radius:8px;background:rgba(57,255,136,.12);color:var(--neon);font:700 .85rem ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;text-decoration:none}
+a.btn:hover{background:var(--neon);color:#021008;box-shadow:0 0 18px rgba(57,255,136,.45)}
+button.ghost{border-color:var(--line);color:var(--ink);background:transparent}
+.card{background:linear-gradient(160deg,rgba(14,32,26,.9),rgba(8,16,13,.92));border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 0 0 1px rgba(57,255,136,.04) inset,0 8px 28px rgba(0,0,0,.4)}
+.note{color:var(--mute);font-size:.85rem}
+.msg{margin-top:12px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:#050c0a}
 .msg.err{color:var(--err);border-color:var(--err)}
-.chk{display:flex;gap:10px;align-items:center;margin-top:14px;color:var(--ink);font-size:1rem}
-.chk input{width:22px;height:22px}
+.msg.ok{color:var(--neon);border-color:var(--neon)}
+.tag{display:inline-block;padding:2px 10px;border:1px solid var(--neon);border-radius:99px;color:var(--neon);font-size:.78rem}
 ul{list-style:none;margin:0;padding:0}
-li{padding:10px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+li{padding:10px 0;border-bottom:1px solid var(--line)}
 li small{display:block;color:var(--mute)}
-.note{font-size:.85rem;color:var(--mute)}
-.fh{display:flex;gap:12px;align-items:center;margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
-.fh img{width:60px;height:60px;border-radius:50%;border:2px solid var(--gold);flex:none}
-#pRow{display:flex;gap:10px}#pRow input{flex:1;min-width:0}#pRow button{margin:0}
 [hidden]{display:none!important}
+/* login */
+#hero{min-height:300px;display:grid;place-items:end center;text-align:center;padding:calc(30px + env(safe-area-inset-top,0px)) 16px 26px;background:linear-gradient(rgba(4,8,10,.15),rgba(4,8,10,.45) 60%,#04080a),radial-gradient(600px 300px at 50% 0,rgba(57,255,136,.28),transparent),#04080a}
+#hero h1{font-size:2.1rem;text-shadow:0 0 24px rgba(57,255,136,.6)}
+#hero p{margin:6px 0 0;color:var(--mute);letter-spacing:.3em;font-size:.72rem;font-family:ui-monospace,monospace}
+.wrap{max-width:560px;margin:0 auto;padding:16px}
+.code{font:800 2rem ui-monospace,monospace;color:var(--neon);text-align:center;letter-spacing:.2em;padding:14px;border:1px dashed var(--neon);border-radius:10px;margin:12px 0;text-shadow:0 0 14px rgba(57,255,136,.6);user-select:all}
+/* app */
+.top{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:12px;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;background:rgba(4,8,10,.92);border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
+.top button{margin:0;padding:8px 12px;font-size:1.1rem;line-height:1}
+.top b{letter-spacing:.14em;text-transform:uppercase;color:var(--neon)}
+.top .who{margin-left:auto;font-size:.8rem;color:var(--mute)}
+#bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:90}
+#menu{position:fixed;top:0;left:0;bottom:0;width:270px;max-width:82vw;z-index:100;background:#071210;border-right:1px solid var(--neon);box-shadow:0 0 30px rgba(57,255,136,.2);transform:translateX(-105%);transition:transform .2s;padding:calc(18px + env(safe-area-inset-top,0px)) 14px 14px;overflow-y:auto}
+#menu.open{transform:none}
+#menu .brand{padding:0 6px 14px;border-bottom:1px solid var(--line);margin-bottom:8px}
+#menu .brand img{grid-row:span 2;width:46px;height:46px;border-radius:10px;border:1px solid var(--neon);object-fit:cover}
+.top .logo{width:30px;height:30px;border-radius:8px;border:1px solid var(--neon);object-fit:cover}
+#menu .brand b{display:block;color:var(--neon);letter-spacing:.12em;text-transform:uppercase}
+#menu .brand span{font:.65rem ui-monospace,monospace;color:var(--mute);letter-spacing:.3em}
+#menu button{display:block;width:100%;text-align:left;margin:4px 0;border-color:transparent;background:transparent;color:#b6d6c6;padding:13px 12px}
+#menu button.on{background:linear-gradient(90deg,rgba(57,255,136,.2),transparent);border-color:rgba(57,255,136,.4);color:var(--neon)}
+main{max-width:760px;margin:0 auto;padding:16px}
+.hd{display:flex;gap:14px;align-items:center}
+.pic{width:84px;height:84px;border-radius:14px;border:2px solid var(--neon);box-shadow:0 0 18px rgba(57,255,136,.35);flex:none}
+.mini{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:#050c0a;flex:none}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin-top:8px;font-size:.88rem}
+.kv span{color:var(--mute);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;align-self:center}
+.row{display:flex;gap:10px}.row input{flex:1;min-width:0}.row button{margin:0}
+.item{display:flex;gap:12px;align-items:center;cursor:pointer}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+.stats div{border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.stats b{display:block;font-size:1.4rem;color:var(--neon)}
+.stats span{font-size:.68rem;color:var(--mute);letter-spacing:.1em;text-transform:uppercase}
+.tabbar{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px}
+.tabbar button{flex:none;margin:0;white-space:nowrap;border-color:var(--line);background:transparent;color:var(--ink)}
+.tabbar button.on{border-color:var(--neon);background:rgba(57,255,136,.15);color:var(--neon)}
+.fh{display:flex;gap:12px;align-items:center;margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#050c0a}
+.fh img{width:56px;height:56px;border-radius:10px;border:1px solid var(--neon);flex:none}
+.cnt{font-size:.75rem;color:var(--mute);text-align:right}
+.chk{display:flex;gap:10px;align-items:center;margin-top:14px}.chk input{width:20px;height:20px}
 </style>
 </head>
 <body>
-<header>
-  <h1>Exército Brasileiro · Painel de Patentes</h1>
-  <p>Vincule sua conta Roblox, promova militares e registre o CDP.</p>
-</header>
-<main>
 
-<section id="login" class="card">
-  <h2>Vincular conta Roblox</h2>
-  <p class="note">Você sai do nosso site e entra direto em <strong>roblox.com</strong>. A senha é digitada lá, nunca aqui. Sua patente é lida direto do grupo do jogo — ninguém escolhe ou digita a própria patente.</p>
-  <a id="btnRblx" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none;text-align:center">Entrar com Roblox</a>
-  <div id="noApi" class="msg" hidden>Servidor ainda não configurado (ver server.js) — sem ele o site não consegue ler patentes reais, então o login fica desativado para evitar que alguém informe uma patente falsa.</div>
-  <div id="codeBox" style="margin-top:14px">
-    <label for="authcode">Depois de entrar no Roblox, cole aqui o código que apareceu</label>
-    <input id="authcode" autocomplete="off" placeholder="Ex.: AB12-CD34">
-    <button id="btnCode">Confirmar login</button>
+<section id="login">
+  <div id="hero"><div><h1 id="loginNome">Yso System</h1><p>EXÉRCITO BRASILEIRO DO YSO</p></div></div>
+  <div class="wrap">
+    <div class="card">
+      <h2>Entrar</h2>
+      <p class="note">Você entra pela sua conta oficial do Roblox. A senha é digitada lá, nunca aqui.</p>
+      <a id="btnRblx" class="btn" href="#">Entrar com Roblox</a>
+      <div id="lMsg" class="msg" hidden></div>
+    </div>
   </div>
-  <div id="lMsg" class="msg" hidden></div>
 </section>
 
 <div id="app" hidden>
-  <div class="card me">
-    <div class="av" id="av"></div>
-    <div><strong id="meNick"></strong><br><span class="rank" id="meRank"></span></div>
-    <button class="ghost" id="btnOut" style="margin-left:auto">Sair</button>
-  </div>
+  <header class="top"><button id="btnMenu" aria-label="Menu">&#9776;</button><b id="siteNome">Yso System</b><span class="who" id="topUser"></span></header>
+  <div id="bg" hidden></div>
+  <nav id="menu">
+    <div class="brand"><b id="menuNome">Yso System</b><span>EXÉRCITO BRASILEIRO DO YSO</span></div>
+    <button data-p="perfil" class="on">Perfil</button>
+    <button data-p="efetivo">Efetivo</button>
+    <button data-p="ativ">Atividades</button>
+    <button data-p="aud">Auditoria</button>
+    <button data-p="cfg" id="navCfg" hidden>Configurações</button>
+    <button id="btnOut" class="ghost" style="margin-top:18px">Sair</button>
+  </nav>
 
-  <div class="tabs" role="tablist">
-    <button class="tab" role="tab" aria-selected="true" data-t="promo">Subir patente</button>
-    <button class="tab" role="tab" aria-selected="false" data-t="cdp">CDP</button>
-    <button class="tab" role="tab" aria-selected="false" data-t="hist">Histórico</button>
-  </div>
+  <main>
+    <section id="p-perfil"><div id="perfilBox"></div></section>
 
-  <section id="t-promo" class="card">
-    <h2>Subir patente</h2>
-    <label for="pNick">Nick do militar</label>
-    <div id="pRow"><input id="pNick" autocomplete="off" placeholder="Nick no Roblox"><button id="btnBusca">Buscar</button></div>
-    <div id="pPrev" class="fh" hidden></div>
-    <div id="superBox" hidden>
-      <label for="pRole">Promoção atípica: escolha a patente</label>
-      <select id="pRole"></select>
-    </div>
-    <label class="chk" id="pTreinBox"><input type="checkbox" id="pTrein"> Confirmo que ele concluiu o treinamento</label>
-    <button id="btnPromo">Promover</button>
-    <button class="ghost" id="btnRebx" hidden>Rebaixar</button>
-    <div id="pMsg" class="msg" hidden></div>
-  </section>
+    <section id="p-efetivo" hidden class="card">
+      <h2>Efetivo</h2>
+      <select id="eRank"><option value="">Todas as patentes</option></select>
+      <input id="eQ" placeholder="Buscar nick" style="margin-top:8px">
+      <p class="cnt" id="eCount"></p>
+      <div id="eMsg" class="msg err" hidden></div>
+      <ul id="eList"></ul>
+    </section>
 
-  <section id="t-cdp" class="card" hidden>
-    <h2>Registrar CDP</h2>
-    <label for="cNick">Nick do militar</label>
-    <input id="cNick" autocomplete="off" placeholder="Nick no Roblox">
-    <label for="cObs">Observação (opcional)</label>
-    <input id="cObs" placeholder="Ex.: turma de sábado">
-    <button id="btnCdp">Registrar CDP concluído</button>
-    <div id="cMsg" class="msg" hidden></div>
-    <h2 style="margin-top:18px">Militares com CDP</h2>
-    <ul id="cList"></ul>
-  </section>
+    <section id="p-ativ" hidden>
+      <div class="card">
+        <h2>Atividades</h2>
+        <div class="tabbar" id="aBar"></div>
+        <div id="aForm" hidden>
+          <label for="aNick">Nick do militar</label>
+          <div class="row"><input id="aNick" autocomplete="off" placeholder="Nick no Roblox"><button id="btnBusca">Buscar</button></div>
+          <div id="aPrev" class="fh" hidden></div>
+          <div id="aRoleBox" hidden><label for="aRole">Nova patente</label><select id="aRole"></select></div>
+          <div id="aMotBox" hidden><label for="aMot">Motivo</label><input id="aMot" maxlength="200" placeholder="Descreva o motivo"></div>
+          <label class="chk" id="aTrBox" hidden><input type="checkbox" id="aTr"> Confirmo que ele concluiu o treinamento</label>
+          <button id="btnAct">Aplicar</button>
+        </div>
+        <div id="aMsg" class="msg" hidden></div>
+      </div>
+    </section>
 
-  <section id="t-hist" class="card" hidden>
-    <h2>Histórico de promoções</h2>
-    <ul id="hList"></ul>
-  </section>
+    <section id="p-aud" hidden class="card">
+      <h2>Auditoria</h2>
+      <label for="uQ">Quem fez</label><input id="uQ" placeholder="Nick de quem executou">
+      <label for="uA">Quem foi afetado</label><input id="uA" placeholder="Nick do militar afetado">
+      <label for="uT">Tipo de ação</label>
+      <select id="uT"><option value="">Todas</option><option>Promoção Normal</option><option>Promoção Atípica</option><option>Advertência</option><option>Rebaixamento</option><option>Exílio</option><option>Instituições</option><option>Configuração</option></select>
+      <div class="row"><div style="flex:1"><label for="uD">De</label><input id="uD" type="date"></div><div style="flex:1"><label for="uE">Até</label><input id="uE" type="date"></div></div>
+      <button id="btnAud">Buscar</button>
+      <div id="uMsg" class="msg err" hidden></div>
+      <ul id="uList" style="margin-top:12px"></ul>
+    </section>
+
+    <section id="p-cfg" hidden class="card">
+      <h2>Configurações</h2>
+      <p class="note" id="cInfo"></p>
+      <label for="cNome">Nome do site</label><input id="cNome" maxlength="30">
+      <label for="cCor">Cor de destaque</label><input id="cCor" type="color" style="height:46px;padding:4px">
+      <label for="cCapa">Foto de capa (link https ou nome do arquivo no site, ex.: capa.jpg)</label><input id="cCapa" placeholder="capa.jpg">
+      <label for="cHook">Webhook do Discord (deixe vazio para manter)</label><input id="cHook" placeholder="https://discord.com/api/webhooks/..." autocomplete="off">
+      <button id="btnCfg">Salvar</button>
+      <div id="cMsg" class="msg" hidden></div>
+    </section>
+  </main>
 </div>
 
-<p class="note" style="text-align:center">Jogo: Exército Brasileiro (Roblox) · protótipo do painel · Créditos: Mackijah</p>
-</main>
-
 <script>
-var API="https://execito-2.onrender.com";/* URL do servidor (server.js). Vazio = modo demonstração */
-var MAXP=17;/* última patente alcançável por promoção: General de Exército */
-var RANKS=["[REC] Recruta","[SLD] Soldado","[CB] Cabo","[T-SGT] Terceiro Sargento","[S-SGT] Segundo Sargento","[P-SGT] Primeiro Sargento","[ST] Subtenente","[CDT] Cadete","[ASP] Aspirante a Oficial","[2º TEN] Segundo Tenente","[1º TEN] Primeiro Tenente","[CAP] Capitão","[MAJ] Major","[TEN-CEL] Tenente Coronel","[CEL] Coronel","[GEN-B] General de Brigada","[GEN-D] General de Divisão","[GEN-E] General de Exército","[SP] Sub-Patriarca","[PA] Patriarca","[SB] Soberano","[SUB-CMT] Subcomandante","[CMT] Comandante","[V-PRES] Vice Presidente","[PRES] Presidente","[INV] Investidor","[SC] Sócios","[DEV] Developer","[EST-ADM] Estagiário Administrativo","[F-ADM] Fiscal Administrativo","[D-ADM] Diretor Administrativo","[D-G-ADM] Diretor Geral Administrativo","[SCR] Sub Creator","[CR] Creator"];
-var DB={me:null,users:{},cdp:{},hist:[]};
+var API="https://execito-2.onrender.com";
 var $=function(i){return document.getElementById(i)};
-function load(){try{var s=localStorage.getItem("eb_db2");if(s)DB=JSON.parse(s)}catch(e){}}
-function save(){try{localStorage.setItem("eb_db2",JSON.stringify(DB))}catch(e){}}
-function key(n){return n.trim().toLowerCase()}
-function rankOf(n){var u=DB.users[key(n)];return u?u.rank:0}
-function show(el,txt,err){el.hidden=false;el.textContent=txt;el.className="msg"+(err?" err":"")}
-function esc(s){return s.replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+var DB={me:null};
+function load(){try{var s=localStorage.getItem("eb_db3");if(s)DB=JSON.parse(s)}catch(e){}}
+function save(){try{localStorage.setItem("eb_db3",JSON.stringify(DB))}catch(e){}}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function dt(i){return new Date(i).toLocaleString("pt-BR")}
+function show(el,t,k){el.hidden=false;el.textContent=t;el.className="msg"+(k==="ok"?" ok":k?" err":"")}
+function api(p,b){
+  var o={headers:{"Content-Type":"application/json"}},u=API+p;
+  if(b){o.method="POST";o.body=JSON.stringify(Object.assign({token:DB.me&&DB.me.token},b))}
+  else if(DB.me)u+=(p.indexOf("?")<0?"?":"&")+"token="+encodeURIComponent(DB.me.token);
+  return fetch(u,o).then(function(r){return r.json()}).then(function(d){
+    if(d&&d.error&&/Sessão inválida/.test(d.error)&&DB.me){DB.me=null;save();render()}
+    return d});
+}
+var NET="Servidor indisponível. Se ele estava dormindo, espere 1 minuto e tente de novo.";
 
+/* ---------- visual do site (nome, cor, capa) ---------- */
+function aplicarSite(d){
+  document.documentElement.style.setProperty("--neon",d.cor||"#39ff88");
+  ["loginNome","siteNome","menuNome"].forEach(function(i){$(i).textContent=d.nome});
+  document.title=d.nome;
+  if(d.capa&&d.capa!=="capa.jpg")$("hero").style.backgroundImage='linear-gradient(rgba(4,8,10,.55),#04080a),url("'+d.capa.replace(/"/g,"")+'")';
+}
+fetch(API+"/api/site").then(function(r){return r.json()}).then(aplicarSite).catch(function(){});
+
+/* ---------- login com o Roblox ---------- */
+$("btnRblx").href=API+"/auth/start";
+$("btnRblx").onclick=function(){show($("lMsg"),"Abrindo o Roblox... se demorar, o servidor está acordando (até 1 minuto).")};
+(function(){ // volta do Roblox: o servidor manda ?authcode= e o site entra sozinho
+  var code=new URLSearchParams(location.search).get("authcode");if(!code)return;
+  history.replaceState(null,"",location.pathname);show($("lMsg"),"Entrando...");
+  fetch(API+"/api/session?code="+encodeURIComponent(code)).then(function(r){return r.json()}).then(function(d){
+    if(d.error){show($("lMsg"),d.error,1);return}
+    DB.me={token:d.token,nick:d.nick,label:d.label,isSuper:d.isSuper,cfg:d.cfg,perm:d.perm};save();render();
+  }).catch(function(){show($("lMsg"),NET,1)});
+})();
+$("btnOut").onclick=function(){DB.me=null;save();render()};
+
+/* ---------- navegação ---------- */
+function menu(o){$("menu").classList.toggle("open",o);$("bg").hidden=!o}
+$("btnMenu").onclick=function(){menu(!$("menu").classList.contains("open"))};
+$("bg").onclick=function(){menu(false)};
+var LOAD={perfil:function(){perfilLoad()},efetivo:function(){efLoad()},ativ:function(){ativInit()},aud:function(){audLoad()},cfg:function(){cfgLoad()}};
+function go(p){
+  menu(false);
+  document.querySelectorAll("#menu [data-p]").forEach(function(b){b.classList.toggle("on",b.dataset.p===p)});
+  ["perfil","efetivo","ativ","aud","cfg"].forEach(function(x){$("p-"+x).hidden=(x!==p)});
+  if(LOAD[p])LOAD[p]();
+}
+document.querySelectorAll("#menu [data-p]").forEach(function(b){b.onclick=function(){go(b.dataset.p)}});
 function render(){
   var on=!!DB.me;$("login").hidden=on;$("app").hidden=!on;
   if(!on)return;
-  $("av").textContent=DB.me.nick.charAt(0).toUpperCase();
-  $("meNick").textContent=DB.me.nick;
-  $("meRank").textContent=DB.me.label||RANKS[rankOf(DB.me.nick)];
-  var P=DB.me.perm||{atipica:!!DB.me.isSuper,rebaixar:!!DB.me.isSuper};
-  $("superBox").hidden=!P.atipica;
-  $("pTreinBox").hidden=!!P.atipica;
-  $("btnRebx").hidden=!P.rebaixar;
-  if(P.atipica && !$("pRole").options.length){
-    fetch(API+"/api/roles").then(function(r){return r.json()}).then(function(list){
-      $("pRole").innerHTML=list.map(function(x){return'<option value="'+x.id+'">'+esc(x.name)+'</option>'}).join("");
-    });
-  }
-  var h=DB.hist.slice().reverse().map(function(x){return"<li><strong>"+esc(x.nick)+"</strong>: "+x.from+" → "+x.to+"<small>por "+esc(x.by)+" · "+x.date+"</small></li>"}).join("");
-  $("hList").innerHTML=h||"<li>Nenhuma promoção ainda.</li>";
-  var c=Object.keys(DB.cdp).map(function(k){var x=DB.cdp[k];return"<li><strong>"+esc(x.nick)+"</strong>"+(x.obs?" · "+esc(x.obs):"")+"<small>registrado por "+esc(x.by)+" · "+x.date+"</small></li>"}).join("");
-  $("cList").innerHTML=c||"<li>Nenhum CDP registrado.</li>";
+  $("topUser").textContent=DB.me.nick;
+  $("navCfg").hidden=!DB.me.cfg;
+  go("perfil");
 }
 
-if(!API){
-  $("noApi").hidden=false;
-  $("btnRblx").setAttribute("aria-disabled","true");
-  $("btnRblx").removeAttribute("href");
-  $("codeBox").hidden=true;
-}else{
-  // Link direto (não é um clique por JS) para a tela oficial do Roblox, que abre em nova aba:
-  // assim o navegador sai de verdade do sandbox do chat sem ser bloqueado pela política de segurança.
-  $("btnRblx").href=API+"/auth/start";
+/* ---------- Perfil ---------- */
+function cdpTxt(c){
+  if(!c||!c.proxima)return"Patente máxima da escada.";
+  if(c.semRegistro||c.restanteMs<=0)return"CDP para "+c.proxima+": liberado.";
+  var m=Math.ceil(c.restanteMs/60000),h=Math.floor(m/60);
+  return"CDP para "+c.proxima+": falta "+(h?h+"h ":"")+(m%60)+"min.";
 }
-$("btnCode").onclick=function(){
-  var code=$("authcode").value.trim(),m=$("lMsg");
-  if(!code){show(m,"Cole o código que apareceu depois do login no Roblox.",1);return}
-  fetch(API+"/api/session?code="+encodeURIComponent(code))
-  .then(function(r){return r.json()}).then(function(d){
-    if(d.error){show(m,d.error,1);return}
-    DB.me={nick:d.nick,token:d.token,label:d.label,isSuper:!!d.isSuper,perm:d.perm||null};save();render();
-  }).catch(function(){show(m,"Servidor indisponível.",1)});
-};
-$("btnOut").onclick=function(){
-  DB.me=null;save();
-  if(API){location.href=API+"/auth/logout?return="+encodeURIComponent(location.origin+location.pathname)}
-  else render();
-};
-// Volta do login do Roblox: a URL traz um código de uma única vez para trocar por nick+patente
-(function(){
-  var p=new URLSearchParams(location.search),code=p.get("authcode");
-  if(!code||!API)return;
-  history.replaceState(null,"",location.pathname);
-  fetch(API+"/api/session?code="+encodeURIComponent(code))
-  .then(function(r){return r.json()}).then(function(d){
-    if(d.error){show($("lMsg"),d.error,1);return}
-    DB.me={nick:d.nick,token:d.token,label:d.label,isSuper:!!d.isSuper,perm:d.perm||null};save();render();
-  }).catch(function(){show($("lMsg"),"Servidor indisponível.",1)});
-})();
+function perfilLoad(n){
+  var box=$("perfilBox");box.innerHTML='<p class="note">Carregando perfil...</p>';
+  api("/api/perfil"+(n?"?nick="+encodeURIComponent(n):"")).then(function(d){
+    if(d.error){box.innerHTML='<div class="msg err">'+esc(d.error)+"</div>";return}
+    var D=d.disciplina,li=function(a){return a.map(function(x){return"<li><strong>"+esc(x.tipo)+"</strong> · "+esc(x.motivo||"sem motivo")+(x.para?" ("+esc(x.de)+" → "+esc(x.para)+")":"")+"<small>por "+esc(x.por)+" · "+dt(x.data)+"</small></li>"}).join("")};
+    var h='<div class="card hd">'+(d.avatar?'<img class="pic" src="'+esc(d.avatar)+'" alt="">':"")+"<div><h2 style='margin:0 0 6px'>"+esc(d.nick)+'</h2><span class="tag">'+esc(d.patente||"Fora do grupo")+'</span><div class="kv"><span>ID Roblox</span><b>'+esc(d.id)+"</b><span>Discord</span><b>"+(esc(d.discord)||"não registrado")+"</b></div></div></div>";
+    h+='<div class="card"><h2>Descrição</h2>';
+    if(d.proprio){
+      h+='<textarea id="pfDesc" maxlength="500" placeholder="Escreva sobre você (até 500 caracteres)">'+esc(d.descricao)+'</textarea><div class="cnt" id="pfCnt"></div>'+
+         '<label for="pfDisc">Conta do Discord</label><input id="pfDisc" maxlength="40" placeholder="Seu usuário ou ID do Discord" value="'+esc(d.discord)+'">'+
+         '<button id="pfSave">Salvar perfil</button><div id="pfMsg" class="msg" hidden></div>';
+    }else h+="<p>"+(esc(d.descricao)||'<span class="note">Sem descrição.</span>')+"</p>";
+    h+="</div>";
+    if(d.proprio)h+='<div class="card"><h2>Promoção</h2><p>'+esc(cdpTxt(d.cdp))+"</p></div>";
+    h+='<div class="card"><h2>Instituições</h2><ul>'+(d.instituicoes.map(function(x){return"<li><strong>"+esc(x.nome)+"</strong>"+(x.cargo?" · "+esc(x.cargo):"")+"</li>"}).join("")||'<li class="note">Nenhuma instituição registrada.</li>')+"</ul>";
+    if(d.editaInst)h+='<label for="pfInst">Editar instituições (uma por linha: Instituição — Cargo)</label><textarea id="pfInst">'+esc(d.instManual)+'</textarea><button id="pfInstSave" class="ghost">Salvar instituições</button><div id="pfIMsg" class="msg" hidden></div>';
+    h+="</div>";
+    h+='<div class="card"><h2>Quadro disciplinar</h2><div class="stats"><div><b>'+D.advertencias.length+"</b><span>Advertências</span></div><div><b>"+D.rebaixamentos.length+"</b><span>Rebaixamentos</span></div><div><b>"+D.exilios.length+"</b><span>Exílios</span></div></div>"+
+       '<p class="note">Já foi exilado: <strong>'+(D.exilios.length?"Sim":"Não")+"</strong></p><ul>"+(li(D.advertencias.concat(D.rebaixamentos,D.exilios))||'<li class="note">Ficha limpa.</li>')+"</ul></div>";
+    box.innerHTML=h;
+    if(d.proprio){
+      var t=$("pfDesc"),c=function(){$("pfCnt").textContent=t.value.length+"/500"};t.oninput=c;c();
+      $("pfSave").onclick=function(){api("/api/perfil",{descricao:t.value,discord:$("pfDisc").value}).then(function(r){if(r.error)show($("pfMsg"),r.error,1);else{show($("pfMsg"),"Perfil salvo.","ok")}}).catch(function(){show($("pfMsg"),NET,1)})};
+    }
+    if(d.editaInst)$("pfInstSave").onclick=function(){api("/api/perfil/inst",{target:d.nick,texto:$("pfInst").value}).then(function(r){if(r.error)show($("pfIMsg"),r.error,1);else perfilLoad(d.nick)}).catch(function(){show($("pfIMsg"),NET,1)})};
+  }).catch(function(){box.innerHTML='<div class="msg err">'+NET+"</div>"});
+}
 
-document.querySelectorAll(".tab").forEach(function(b){b.onclick=function(){
-  document.querySelectorAll(".tab").forEach(function(x){x.setAttribute("aria-selected",x===b)});
-  ["promo","cdp","hist"].forEach(function(t){$("t-"+t).hidden=(t!==b.dataset.t)});
-}});
+/* ---------- Efetivo ---------- */
+var EF=[];
+function efLoad(){
+  api("/api/efetivo").then(function(d){
+    if(d.error){show($("eMsg"),d.error,1);return}
+    $("eMsg").hidden=true;EF=d;
+    var nomes={};d.forEach(function(m){nomes[m.patente]=m.idx});var cur=$("eRank").value;
+    $("eRank").innerHTML='<option value="">Todas as patentes</option>'+Object.keys(nomes).sort(function(a,b){return nomes[b]-nomes[a]}).map(function(n){return"<option>"+esc(n)+"</option>"}).join("");
+    $("eRank").value=cur;efDraw();
+  }).catch(function(){show($("eMsg"),NET,1)});
+}
+function efDraw(){
+  var r=$("eRank").value,q=$("eQ").value.toLowerCase();
+  var l=EF.filter(function(m){return(!r||m.patente===r)&&(!q||m.nick.toLowerCase().indexOf(q)>-1)}).sort(function(a,b){return b.idx-a.idx}),v=l.slice(0,100);
+  $("eCount").textContent=l.length+" militares"+(l.length>100?" (mostrando 100, use a busca)":"");
+  $("eList").innerHTML=v.map(function(m){return'<li class="item" data-n="'+esc(m.nick)+'"><img class="mini" data-id="'+m.id+'" alt=""><div><strong>'+esc(m.nick)+"</strong><small>"+esc(m.patente)+"</small></div></li>"}).join("");
+  if(v.length)api("/api/avatares?ids="+v.map(function(m){return m.id}).join(",")).then(function(o){
+    document.querySelectorAll("#eList img[data-id]").forEach(function(i){if(o[i.dataset.id])i.src=o[i.dataset.id]})}).catch(function(){});
+}
+$("eRank").onchange=efDraw;$("eQ").oninput=efDraw;
+$("eList").onclick=function(ev){var li=ev.target.closest("li");if(li){go("perfil");perfilLoad(li.dataset.n)}};
 
+/* ---------- Atividades ---------- */
+var ACTS=[
+ {k:"normal",t:"Promoção Normal",ok:function(P){return P.teto||DB.me.isSuper},btn:"Promover",tr:1},
+ {k:"atipica",t:"Promoção Atípica",ok:function(P){return P.atipica},btn:"Aplicar promoção atípica",role:1,mot:1},
+ {k:"adv",t:"Advertência",ok:function(P){return(P.acoes||[]).indexOf("advertir")>-1},btn:"Advertir",mot:1},
+ {k:"reb",t:"Rebaixamento",ok:function(P){return P.rebaixar},btn:"Rebaixar",mot:1},
+ {k:"exil",t:"Exílio",ok:function(P){return(P.acoes||[]).indexOf("exilar")>-1},btn:"Exilar",mot:1}];
+var ACT=null,ROLES=null;
+function ativInit(){
+  var P=DB.me.perm||{},ok=ACTS.filter(function(a){return a.ok(P)});
+  $("aBar").innerHTML=ok.map(function(a){return'<button data-k="'+a.k+'">'+a.t+"</button>"}).join("");
+  document.querySelectorAll("#aBar button").forEach(function(b){b.onclick=function(){ativSel(b.dataset.k)}});
+  if(!ok.length){$("aForm").hidden=true;show($("aMsg"),"Seu cargo não tem atividades liberadas.",1);return}
+  $("aMsg").hidden=true;ativSel(ACT&&ok.some(function(a){return a.k===ACT.k})?ACT.k:ok[0].k);
+}
+function ativSel(k){
+  ACT=ACTS.filter(function(a){return a.k===k})[0];
+  document.querySelectorAll("#aBar button").forEach(function(b){b.classList.toggle("on",b.dataset.k===k)});
+  $("aForm").hidden=false;$("aMsg").hidden=true;$("aPrev").hidden=true;
+  $("aRoleBox").hidden=!ACT.role;$("aMotBox").hidden=!ACT.mot;$("aTrBox").hidden=!ACT.tr;$("btnAct").textContent=ACT.btn;
+  if(ACT.role&&!ROLES)api("/api/roles").then(function(l){ROLES=l;$("aRole").innerHTML=l.map(function(x){return'<option value="'+x.id+'">'+esc(x.name)+"</option>"}).join("")});
+}
 function prevLoad(){
-  var n=$("pNick").value.trim(),b=$("pPrev");
-  b.hidden=false;
-  if(!n){b.innerHTML='<span class="note">Digite o nick do militar e toque em Buscar.</span>';return}
+  var n=$("aNick").value.trim(),b=$("aPrev");b.hidden=false;
+  if(!n){b.innerHTML='<span class="note">Digite o nick e toque em Buscar.</span>';return}
   b.innerHTML='<span class="note">Buscando...</span>';
-  fetch(API+"/api/ficha?nick="+encodeURIComponent(n)+"&token="+encodeURIComponent(DB.me.token))
-  .then(function(r){return r.json()}).then(function(d){
+  api("/api/perfil?nick="+encodeURIComponent(n)).then(function(d){
     if(d.error){b.innerHTML='<span class="note">'+esc(d.error)+"</span>";return}
-    b.innerHTML=(d.avatar?'<img src="'+esc(d.avatar)+'" alt="">':"")+"<div><strong>"+esc(d.nick)+'</strong><br><span class="rank">'+esc(d.patente||"Fora do grupo")+"</span></div>";
-  }).catch(function(){b.innerHTML='<span class="note">Não consegui buscar. O servidor pode estar dormindo (espere 1 minuto) ou desatualizado (faça o deploy do server.js novo no Render).</span>'});
+    b.innerHTML=(d.avatar?'<img src="'+esc(d.avatar)+'" alt="">':"")+"<div><strong>"+esc(d.nick)+'</strong><br><span class="tag">'+esc(d.patente||"Fora do grupo")+"</span></div>";
+  }).catch(function(){b.innerHTML='<span class="note">'+NET+"</span>"});
 }
-$("btnBusca").onclick=prevLoad;
-$("pNick").onkeydown=function(e){if(e.key==="Enter")prevLoad()};
-function doPromo(reb){
-  var m=$("pMsg"),n=$("pNick").value.trim(),body={target:n,token:DB.me.token};
-  if(reb)body.rebaixar=true;
+$("btnBusca").onclick=prevLoad;$("aNick").onkeydown=function(e){if(e.key==="Enter")prevLoad()};
+$("btnAct").onclick=function(){
+  var m=$("aMsg"),n=$("aNick").value.trim(),mot=$("aMot").value.trim(),k=ACT.k;
   if(!n){show(m,"Digite o nick do militar.",1);return}
-  if(reb){
-  } else if(DB.me.perm?DB.me.perm.atipica:DB.me.isSuper){
-    body.toRoleId=$("pRole").value;
-  } else if(!$("pTrein").checked){
-    show(m,"Confirme que ele concluiu o treinamento.",1);return;
-  }
-  // As permissões (quem promove até onde, promoção atípica, rebaixar) são checadas pelo servidor,
-  // com a patente real de quem promove no grupo do Roblox, nunca por um valor vindo do navegador.
-  fetch(API+"/api/promote",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
-  .then(function(r){return r.json()}).then(function(d){
+  if(ACT.mot&&k!=="atipica"&&!mot){show(m,"Escreva o motivo.",1);return}
+  if(ACT.tr&&!$("aTr").checked){show(m,"Confirme que ele concluiu o treinamento.",1);return}
+  var p="/api/promote",b={target:n};
+  if(k==="atipica"){b.toRoleId=$("aRole").value;b.motivo=mot}
+  else if(k==="reb"){b.rebaixar=true;b.motivo=mot}
+  else if(k==="adv"||k==="exil"){p="/api/punir";b={target:n,tipo:k==="adv"?"Advertência":"Exílio",motivo:mot}}
+  show(m,"Aplicando...");
+  api(p,b).then(function(d){
     if(d.error){show(m,d.error,1);return}
-    DB.hist.push({nick:d.nick,from:d.from,to:d.to,by:DB.me.nick,date:new Date().toLocaleString("pt-BR")});
-    save();render();$("pTrein").checked=false;prevLoad();show(m,d.nick+" foi movido de "+d.from+" para "+d.to+"."+(d.note?" Atenção: "+d.note:""));
-  }).catch(function(){show(m,"Servidor indisponível.",1)});
-}
-$("btnPromo").onclick=function(){doPromo(false)};
-$("btnRebx").onclick=function(){doPromo(true)};
+    show(m,d.from?d.nick+": "+d.from+" → "+d.to+"."+(d.note?" Atenção: "+d.note:""):(d.aviso||"Aplicado com sucesso."),"ok");
+    $("aMot").value="";$("aTr").checked=false;prevLoad();
+  }).catch(function(){show(m,NET,1)});
+};
 
-$("btnCdp").onclick=function(){
-  var m=$("cMsg"),n=$("cNick").value.trim();
-  if(!n){show(m,"Digite o nick do militar.",1);return}
-  if(DB.cdp[key(n)]){show(m,n+" já tem CDP registrado.",1);return}
-  if(!DB.users[key(n)])DB.users[key(n)]={nick:n,rank:0};
-  DB.cdp[key(n)]={nick:n,obs:$("cObs").value.trim(),by:DB.me.nick,date:new Date().toLocaleString("pt-BR")};
-  save();render();$("cObs").value="";
-  show(m,"CDP de "+n+" registrado.");
+/* ---------- Auditoria ---------- */
+function audLoad(){
+  var q=["quem="+$("uQ").value,"afetado="+$("uA").value,"acao="+$("uT").value,"de="+$("uD").value,"ate="+$("uE").value].map(function(x){var i=x.indexOf("=");return x.slice(0,i+1)+encodeURIComponent(x.slice(i+1))}).join("&");
+  api("/api/audit?"+q).then(function(d){
+    if(d.error){show($("uMsg"),d.error,1);return}
+    $("uMsg").hidden=true;
+    $("uList").innerHTML=d.map(function(x){return"<li><strong>"+esc(x.acao)+"</strong>: "+esc(x.detalhe)+"<small>por "+esc(x.quem)+" · "+dt(x.data)+(x.ip?" · IP "+esc(x.ip):"")+"</small></li>"}).join("")||'<li class="note">Nenhum registro encontrado.</li>';
+  }).catch(function(){show($("uMsg"),NET,1)});
+}
+$("btnAud").onclick=audLoad;
+
+/* ---------- Configurações ---------- */
+function cfgLoad(){
+  api("/api/config").then(function(d){
+    if(d.error){show($("cMsg"),d.error,1);return}
+    $("cMsg").hidden=true;$("cNome").value=d.nome;$("cCor").value=d.cor;$("cCapa").value=d.capa;
+    $("cInfo").textContent="Grupo: "+d.group+" · Chave da API: "+(d.apiKey?"configurada no Render":"FALTANDO no Render")+" · Webhook: "+(d.webhook?"definido":"não definido");
+  }).catch(function(){show($("cMsg"),NET,1)});
+}
+$("btnCfg").onclick=function(){
+  var b={nome:$("cNome").value,cor:$("cCor").value,capa:$("cCapa").value};if($("cHook").value.trim())b.webhook=$("cHook").value.trim();
+  api("/api/config",b).then(function(d){
+    if(d.error){show($("cMsg"),d.error,1);return}
+    $("cHook").value="";aplicarSite({nome:b.nome||"Yso System",cor:b.cor,capa:b.capa});show($("cMsg"),"Configurações salvas.","ok");cfgLoad();
+  }).catch(function(){show($("cMsg"),NET,1)});
 };
 
 load();render();
