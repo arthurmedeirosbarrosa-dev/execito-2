@@ -142,10 +142,16 @@ app.get("/auth/start", (q, s) => {
 // 2) O Roblox manda a pessoa de volta pra cá com um "code" de uso único. Em vez de tentar
 // redirecionar automaticamente de volta ao site (o que falha dentro da janela do Claude),
 // mostramos um código curto na tela para a pessoa colar manualmente no site.
+// Página de aviso escura (no lugar do texto branco puro) quando o login falha.
+const aviso = msg => `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Yso System</title>
+<style>html,body{margin:0;min-height:100%;background:#04080a;color:#dff7ea;font-family:system-ui,sans-serif}body{display:grid;place-items:center;min-height:100vh;text-align:center;padding:24px}
+.c{max-width:380px;border:1px solid #15382c;border-radius:14px;padding:26px;background:#0a1411;box-shadow:0 0 30px rgba(57,255,136,.12)}h2{color:#39ff88;letter-spacing:.1em;text-transform:uppercase;margin:0 0 10px}
+a{display:inline-block;margin-top:16px;padding:11px 18px;border:1px solid #39ff88;border-radius:8px;color:#39ff88;text-decoration:none;font-weight:700}</style></head>
+<body><div class="c"><h2>Yso System</h2><p>${msg}</p><a href="${SITE_ORIGIN || "https://arthurmedeirosbarrosa-dev.github.io/execito-2/"}">Voltar ao site</a></div></body></html>`;
 app.get("/auth/callback", async (q, s) => {
   try {
     const { code, state } = q.query;
-    if (!pending.has(state)) return s.status(400).send("Login expirado, volte ao site e tente de novo.");
+    if (!pending.has(state)) return s.status(400).send(aviso("Login expirado. Volte ao site e tente de novo."));
     pending.delete(state);
 
     const tok = await j("https://apis.roblox.com/oauth/v1/token", {
@@ -156,7 +162,7 @@ app.get("/auth/callback", async (q, s) => {
         grant_type: "authorization_code", code, redirect_uri: REDIRECT_URI
       })
     });
-    if (!tok.access_token) return s.status(400).send("O Roblox recusou o login.");
+    if (!tok.access_token) return s.status(400).send(aviso("O Roblox recusou o login."));
 
     const me = await j("https://apis.roblox.com/oauth/v1/userinfo", {
       headers: { Authorization: "Bearer " + tok.access_token }
@@ -169,21 +175,11 @@ app.get("/auth/callback", async (q, s) => {
     oneTime.set(authcode, session);
     setTimeout(() => oneTime.delete(authcode), 10 * 60000); // expira em 10 min se não for usado
 
-    s.send(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Login feito</title>
-<style>body{font-family:sans-serif;background:#141a11;color:#e8ecdc;text-align:center;padding:40px 20px}
-code{display:inline-block;font-size:1.8rem;letter-spacing:2px;background:#1d2619;border:1px solid #34422d;
-border-radius:6px;padding:14px 22px;margin:18px 0;color:#6aa55c;font-weight:700}
-button{padding:10px 18px;border:0;border-radius:4px;background:#6aa55c;color:#0d140a;font-weight:700;font-size:1rem}
-p{max-width:420px;margin:10px auto;line-height:1.5}</style></head><body>
-<h2>Login feito, ${me.preferred_username}!</h2>
-<p>Volte para a aba do site do Exército Brasileiro e cole este código onde pedir:</p>
-<code id="c">${authcode}</code><br>
-<button onclick="navigator.clipboard.writeText(document.getElementById('c').textContent);this.textContent='Copiado!'">Copiar código</button>
-<p>Esse código vale por 10 minutos. Depois disso pode fechar esta aba.</p>
-</body></html>`);
-  } catch (e) { s.status(500).send("Falha ao falar com o Roblox."); }
+    //Volta direto para o site, já logado (sem pedir código).
+    const volta = new URL(SITE_ORIGIN || "https://arthurmedeirosbarrosa-dev.github.io/execito-2/");
+    volta.searchParams.set("authcode", authcode);
+    s.redirect(volta.toString());
+  } catch (e) { s.status(500).send(aviso("Falha ao falar com o Roblox. Tente de novo em instantes.")); }
 });
 
 // Foto de perfil (headshot) do Roblox para um ID de usuário.
@@ -216,7 +212,7 @@ app.get("/api/session", async (q, s) => {
   const r = await role(me.id);
   if (!r) return s.json({ error: "Você não está no grupo do jogo." });
   const sup = isSuper(me.nick, r.name);
-  s.json({ token: session, nick: me.nick, label: r.name, isSuper: sup,
+  s.json({ token: session, nick: me.nick, label: r.name, isSuper: sup, cfg: CONFIG_USERS.includes(me.nick.toLowerCase()),
            perm: permDe(me.nick, r.name), avatar: await avatar(me.id), cdp: cdpInfo(me.id, r.id, sup) });
 });
 
@@ -228,7 +224,7 @@ app.get("/api/me", async (q, s) => {
     const r = await role(me.id);
     if (!r) return s.json({ error: "Você não está no grupo do jogo." });
     const sup = isSuper(me.nick, r.name);
-    s.json({ nick: me.nick, label: r.name, isSuper: sup, perm: permDe(me.nick, r.name), avatar: await avatar(me.id), cdp: cdpInfo(me.id, r.id, sup) });
+    s.json({ nick: me.nick, label: r.name, isSuper: sup, cfg: CONFIG_USERS.includes(me.nick.toLowerCase()), perm: permDe(me.nick, r.name), avatar: await avatar(me.id), cdp: cdpInfo(me.id, r.id, sup) });
   } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
 });
 
@@ -261,7 +257,7 @@ async function resolverLadder() { // acha o ID dos cargos sem ID (Soberanos) pel
 }
 resolverLadder();
 
-//Teto: até qual patente cada faixa promove (a patente-alvo, não a de quem promove).
+// Teto: até qual patente cada faixa promove (a patente-alvo, não a de quem promove).
 const TETO = [
   { de: "Aspirante à Oficial", ate: "Coronel", teto: "Cadete" },                // Oficiais Subalternos a Superiores
   { de: "General de Brigada", ate: "General de Exército", teto: "Coronel" },     // Oficiais Generais
@@ -276,7 +272,7 @@ const ADM_ONLY = ["Subcomandante", "Comandante"];
 const SGEX = [
   { palavras: ["diretor"], acoes: ["advertir", "anular", "rebaixar", "exilar", "blacklist"], atipica: true },  // Vice Diretor+
   { palavras: ["chefe de area"], acoes: ["advertir", "anular", "rebaixar", "exilar"], atipica: true },
-  { palavras: ["coordenador"], acoes: ["advertir", "anular", "rebaixar"], atipica: true },
+  { palavras: ["coordenador"], acoes: ["advertir", "anular", "rebaixar"], atipica: false },
   { palavras: ["supervisor"], acoes: ["advertir", "anular", "rebaixar"], atipica: false },
   { palavras: ["aprendiz", "secretario"], acoes: ["advertir", "rebaixar"], atipica: false },                  // Aprendiz a Secretário Sênior
   { palavras: ["estagiario"], acoes: [], atipica: false },                                                      // sem permissão
@@ -294,7 +290,7 @@ function tetoDe(roleName) {
 function permDe(nick, roleName) {
   const sup = isSuper(nick, roleName), n = norm(roleName), g = SGEX.find(x => x.palavras.some(p => n.includes(p)));
   return {
-    atipica: sup || !!(g && g.atipica),
+    atipica: sup || /fiscal|diretor/.test(n) || !!(g && g.atipica),
     rebaixar: sup || !!(g && g.acoes.includes("rebaixar")),
     admin: sup || /fiscal|diretor/.test(n),
     teto: sup ? "Comandante" : tetoDe(roleName),
@@ -364,9 +360,13 @@ app.post("/api/promote", async (q, s) => {
       return s.json({ error: `O Roblox recusou (status ${r.status}): ${detail.slice(0, 300)}` });
     }
 
-    lastPromo.set(String(t.id), Date.now());
+    const baixou = LADDER.findIndex(x => x.id === next.id) < curIdx;
+    if (!atipicaUsada && !baixou) lastPromo.set(String(t.id), Date.now()); // CDP automático (só Promoção Normal)
     db.hist.push({ id: t.id, nick: t.name, from: cur.name, to: next.name, by: me.nick, date: new Date().toISOString() });
-    audit(q, me.nick, next.id === cur.id || LADDER.findIndex(x => x.id === next.id) > curIdx ? "Promoção" : "Rebaixamento", `${t.name}: ${cur.name} → ${next.name}`);
+    const tipoAcao = baixou ? "Rebaixamento" : (atipicaUsada ? "Promoção Atípica" : "Promoção Normal");
+    if (baixou) { const f = db.fichas[t.id] || (db.fichas[t.id] = { estado: "Ativo", registros: [] });
+      (f.punicoes = f.punicoes || []).push({ tipo: "Rebaixamento", motivo: String(q.body.motivo || "").trim().slice(0, 200), de: cur.name, para: next.name, por: me.nick, data: new Date().toISOString() }); }
+    audit(q, me.nick, tipoAcao, `${t.name}: ${cur.name} → ${next.name}` + (q.body.motivo ? ` (${String(q.body.motivo).slice(0, 200)})` : ""));
     s.json({ nick: t.name, from: cur.name, to: next.name, note: CDP_NOTAS[next.name] || null });
   } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
 });
@@ -438,13 +438,6 @@ app.post("/api/ficha", async (q, s) => {
   } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
 });
 
-app.get("/api/audit", async (q, s) => {
-  try {
-    const w = await who(q); if (!w) return s.json(NOSESS);
-    if (!w.sup) return s.json({ error: "Só quem tem poder total vê a auditoria." });
-    s.json(db.audit.slice(-200).reverse());
-  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
-});
 
 // ================= Treinos, atividades, organização, config e sincronização =================
 const wrap = fn => async (q, s) => { try { const w = await who(q); if (!w) return s.json(NOSESS); await fn(q, s, w); } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); } };
@@ -490,13 +483,6 @@ app.post("/api/org", wrap((q, s, w) => {
 }));
 
 // A chave da API e o ID do grupo ficam nas variáveis do Render (mais seguro); aqui só se vê o status.
-app.get("/api/config", wrap((q, s, w) => w.sup ? s.json({ webhook: !!db.config.webhook, group: GROUP, apiKey: !!KEY }) : s.json(NOPERM)));
-app.post("/api/config", wrap((q, s, w) => {
-  if (!w.sup) return s.json(NOPERM);
-  const u = txt(q.body.webhook, 300);
-  if (u && !/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//.test(u)) return s.json({ error: "Isso não parece um webhook do Discord." });
-  db.config.webhook = u; audit(q, w.nick, "Configuração", u ? "Webhook do Discord definido" : "Webhook do Discord removido"); s.json({ ok: true });
-}));
 
 // Sincronização: quem saiu do grupo vira Inativo e perde o CDP guardado. Roda sozinha a cada hora.
 async function syncGrupo(q, quem) {
@@ -511,4 +497,112 @@ async function syncGrupo(q, quem) {
 setInterval(() => syncGrupo(null, "Sistema").catch(() => {}), 3600000);
 app.post("/api/sync", wrap(async (q, s, w) => w.sup ? s.json(await syncGrupo(q, w.nick)) : s.json(NOPERM)));
 
+// ================= Yso System: Bio-Code, perfil, punições, auditoria e configurações =================
+const CONFIG_USERS = ["tutu2345no", "joelindo6", "ysodmdg"]; // só estes acessam Configurações
+
+// --- Entrar pelo Bio-Code: o site gera o código, a pessoa põe na bio do Roblox e o site confere.
+const bio = new Map(), bioPorId = new Map(); // código único, válido por 10 min
+app.post("/auth/bio/start", async (q, s) => {
+  try {
+    const t = await user(txt(q.body.nick, 30)); if (!t) return s.json({ error: "Nick não encontrado no Roblox." });
+    if (!(await role(t.id))) return s.json({ error: "Esse nick não está no grupo do jogo." });
+    const velho = bioPorId.get(t.id); if (velho) bio.delete(velho);
+    let c; do { c = "YSO-" + crypto.randomBytes(3).toString("hex").toUpperCase(); } while (bio.has(c));
+    bio.set(c, { id: t.id, exp: Date.now() + 600000 }); bioPorId.set(t.id, c);
+    setTimeout(() => { if (bio.has(c)) { bio.delete(c); bioPorId.delete(t.id); } }, 600000);
+    s.json({ codigo: c, nick: t.name, segundos: 600 });
+  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
+});
+app.post("/auth/bio/check", async (q, s) => {
+  try {
+    const t = await user(txt(q.body.nick, 30)); if (!t) return s.json({ error: "Nick não encontrado no Roblox." });
+    const c = bioPorId.get(t.id), e = c && bio.get(c);
+    if (!e || e.exp < Date.now()) return s.json({ error: "Código expirado ou não gerado. Gere um novo." });
+    const d = await j(`https://users.roblox.com/v1/users/${t.id}`);
+    if (!String(d.description || "").includes(c)) return s.json({ error: "Não achei o código na sua bio. Salve a bio no Roblox e tente de novo." });
+    bio.delete(c); bioPorId.delete(t.id); // uso único
+    const r = await role(t.id); if (!r) return s.json({ error: "Você não está no grupo do jogo." });
+    const token = crypto.randomUUID(); sessions.set(token, { id: String(t.id), nick: t.name });
+    s.json({ token, nick: t.name, label: r.name, isSuper: isSuper(t.name, r.name), cfg: CONFIG_USERS.includes(t.name.toLowerCase()), perm: permDe(t.name, r.name) });
+  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
+});
+
+// --- Visual do site (público): nome, cor e capa. Quem edita é CONFIG_USERS.
+app.get("/api/site", (q, s) => s.json({ nome: db.config.nome || "Yso System", cor: db.config.cor || "#39ff88", capa: db.config.capa || "capa.jpg" }));
+app.get("/api/config", wrap((q, s, w) => CONFIG_USERS.includes(w.nick.toLowerCase())
+  ? s.json({ nome: db.config.nome || "Yso System", cor: db.config.cor || "#39ff88", capa: db.config.capa || "capa.jpg", webhook: !!db.config.webhook, group: GROUP, apiKey: !!KEY }) : s.json(NOPERM)));
+app.post("/api/config", wrap((q, s, w) => {
+  if (!CONFIG_USERS.includes(w.nick.toLowerCase())) return s.json(NOPERM);
+  const b = q.body, c = db.config;
+  if (b.nome !== undefined) c.nome = txt(b.nome, 30) || "Yso System";
+  if (b.cor !== undefined) { if (!/^#[0-9a-f]{6}$/i.test(b.cor)) return s.json({ error: "Cor inválida (use #39ff88)." }); c.cor = b.cor; }
+  if (b.capa !== undefined) { const u = txt(b.capa, 300); if (u && !/^(https:\/\/|[\w.\/-]+$)/.test(u)) return s.json({ error: "Capa inválida." }); c.capa = u; }
+  if (b.webhook) { if (!/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//.test(b.webhook)) return s.json({ error: "Isso não parece um webhook do Discord." }); c.webhook = b.webhook; }
+  audit(q, w.nick, "Configuração", "Configurações do site alteradas"); s.json({ ok: true });
+}));
+
+// --- Fotos em lote para o Efetivo (até 100 por vez)
+app.get("/api/avatares", wrap(async (q, s) => {
+  const ids = String(q.query.ids || "").split(",").filter(x => /^\d+$/.test(x)).slice(0, 100);
+  if (!ids.length) return s.json({});
+  const d = await j(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${ids.join(",")}&size=150x150&format=Png&isCircular=false`);
+  const o = {}; (d.data || []).forEach(x => { o[x.targetId] = x.imageUrl; }); s.json(o);
+}));
+
+// --- Perfil (sem nick = o próprio)
+app.get("/api/perfil", wrap(async (q, s, w) => {
+  const t = q.query.nick ? await user(txt(q.query.nick, 30)) : { id: w.id, name: w.nick };
+  if (!t) return s.json({ error: "Militar não encontrado." });
+  const r = await role(t.id), f = db.fichas[t.id] || {}, P = f.punicoes || [], proprio = String(t.id) === String(w.id);
+  const inst = [];
+  if (r && isSuper(t.name, r.name)) inst.push({ nome: "CEx", cargo: r.name });
+  if (r && SGEX.some(g => g.palavras.some(p => norm(r.name).includes(p)))) inst.push({ nome: "SGEx", cargo: r.name });
+  const pun = tp => P.filter(x => x.tipo === tp).reverse();
+  s.json({ id: t.id, nick: t.name, patente: r && r.name, avatar: await avatar(t.id), discord: f.discord || "", descricao: f.descricao || "",
+    instituicoes: inst.concat(f.instituicoes || []), instManual: (f.instituicoes || []).map(x => `${x.nome} — ${x.cargo}`).join("\n"),
+    disciplina: { advertencias: pun("Advertência"), rebaixamentos: pun("Rebaixamento"), exilios: pun("Exílio") },
+    proprio, editaInst: w.sup, cdp: proprio && r ? cdpInfo(t.id, r.id, w.sup) : null });
+}));
+app.post("/api/perfil", wrap((q, s, w) => {
+  const f = db.fichas[w.id] || (db.fichas[w.id] = { estado: "Ativo", registros: [] });
+  if (q.body.descricao !== undefined) f.descricao = txt(q.body.descricao, 500);
+  if (q.body.discord !== undefined) f.discord = txt(q.body.discord, 40);
+  persist(); s.json({ ok: true });
+}));
+app.post("/api/perfil/inst", wrap(async (q, s, w) => { // instituições além de CEx/SGEx (divisão, STM, OAEx, DPU, RCE, MPM...)
+  if (!w.sup) return s.json(NOPERM);
+  const t = await user(txt(q.body.target, 30)); if (!t) return s.json({ error: "Militar não encontrado." });
+  const f = db.fichas[t.id] || (db.fichas[t.id] = { estado: "Ativo", registros: [] });
+  f.instituicoes = String(q.body.texto || "").split("\n").map(l => l.split("—").map(x => x.trim())).filter(p => p[0]).slice(0, 15).map(p => ({ nome: p[0].slice(0, 40), cargo: (p[1] || "").slice(0, 40) }));
+  audit(q, w.nick, "Instituições", `${t.name}: atualizadas`); s.json({ ok: true });
+}));
+
+// --- Advertência e Exílio (Rebaixamento e promoções saem por /api/promote)
+app.post("/api/punir", wrap(async (q, s, w) => {
+  const tipo = q.body.tipo, nec = { "Advertência": "advertir", "Exílio": "exilar" }[tipo];
+  if (!nec || !permDe(w.nick, w.role.name).acoes.includes(nec)) return s.json(NOPERM);
+  const motivo = txt(q.body.motivo, 200); if (!motivo) return s.json({ error: "Escreva o motivo." });
+  const t = await user(txt(q.body.target, 30)); if (!t) return s.json({ error: "Militar não encontrado." });
+  if (String(t.id) === String(w.id)) return s.json({ error: "Você não pode aplicar isso em si mesmo." });
+  const r = await role(t.id); if (r && isSuper(t.name, r.name) && !w.sup) return s.json({ error: "Você não pode punir um membro da CEx." });
+  const f = db.fichas[t.id] || (db.fichas[t.id] = { estado: "Ativo", registros: [] });
+  (f.punicoes = f.punicoes || []).push({ tipo, motivo, por: w.nick, data: new Date().toISOString() });
+  if (tipo === "Exílio") f.estado = "Inativo";
+  audit(q, w.nick, tipo, `${t.name}: ${motivo}`);
+  s.json({ ok: true, aviso: tipo === "Exílio" ? "Exílio registrado. Remover do grupo no Roblox continua sendo manual." : null });
+}));
+
+// --- Auditoria com filtros: quem fez, quem foi afetado, tipo de ação, período. O IP só a CEx vê.
+app.get("/api/audit", wrap((q, s, w) => {
+  const { quem, afetado, acao, de, ate } = q.query, low = x => String(x || "").toLowerCase(), dia = /^\d{4}-\d{2}-\d{2}$/;
+  let l = db.audit;
+  if (quem) l = l.filter(x => low(x.quem).includes(low(quem)));
+  if (afetado) l = l.filter(x => low(x.detalhe).includes(low(afetado)));
+  if (acao) l = l.filter(x => x.acao === acao);
+  if (dia.test(de || "")) l = l.filter(x => x.data >= new Date(de + "T00:00:00").toISOString());
+  if (dia.test(ate || "")) l = l.filter(x => x.data <= new Date(ate + "T23:59:59").toISOString());
+  s.json(l.slice(-300).reverse().map(x => w.sup ? x : { ...x, ip: undefined }));
+}));
+
 app.listen(process.env.PORT || 3000);
+      
