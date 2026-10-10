@@ -213,6 +213,10 @@ function render(){
   $("topUser").textContent=DB.me.nick;
   $("navCfg").hidden=!DB.me.cfg;
   go("perfil");
+  api("/api/me").then(function(d){ // atualiza permissões e patente sem precisar entrar de novo
+    if(!d||d.error||!DB.me)return;
+    DB.me.perm=d.perm;DB.me.label=d.label;DB.me.isSuper=d.isSuper;DB.me.cfg=d.cfg;save();$("navCfg").hidden=!d.cfg;
+  }).catch(function(){});
 }
 
 /* ---------- Perfil ---------- */
