@@ -216,7 +216,7 @@ app.get("/api/session", async (q, s) => {
   if (!r) return s.json({ error: "Você não está no grupo do jogo." });
   const sup = isSuper(me.nick, r.name);
   s.json({ token: session, nick: me.nick, label: r.name, isSuper: sup, cfg: CONFIG_USERS.includes(me.nick.toLowerCase()),
-           perm: permDe(me.nick, r.name), avatar: await avatar(me.id), cdp: cdpInfo(me.id, r.id, sup) });
+           perm: permDe(me.nick, r.name, r.id), avatar: await avatar(me.id), cdp: cdpInfo(me.id, r.id, sup) });
 });
 
 // Atualiza o cabeçalho (patente + CDP) sem precisar logar de novo. O site chama a cada ~30s.
@@ -227,7 +227,7 @@ app.get("/api/me", async (q, s) => {
     const r = await role(me.id);
     if (!r) return s.json({ error: "Você não está no grupo do jogo." });
     const sup = isSuper(me.nick, r.name);
-    s.json({ nick: me.nick, label: r.name, isSuper: sup, cfg: CONFIG_USERS.includes(me.nick.toLowerCase()), perm: permDe(me.nick, r.name), avatar: await avatar(me.id), cdp: cdpInfo(me.id, r.id, sup) });
+    s.json({ nick: me.nick, label: r.name, isSuper: sup, cfg: CONFIG_USERS.includes(me.nick.toLowerCase()), perm: permDe(me.nick, r.name, r.id), avatar: await avatar(me.id), cdp: cdpInfo(me.id, r.id, sup) });
   } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
 });
 
@@ -280,8 +280,17 @@ const SGEX = [
   { palavras: ["aprendiz", "secretario"], acoes: ["advertir", "rebaixar"], atipica: false },                  // Aprendiz a Secretário Sênior
   { palavras: ["estagiario"], acoes: [], atipica: false },                                                      // sem permissão
 ];
-function tetoDe(roleName) {
-  const n = LADDER.findIndex(x => x.name === roleName);
+function idxDe(roleName, roleId) {
+  let i = roleId ? LADDER.findIndex(x => x.id && String(x.id) === String(roleId)) : -1;
+  if (i === -1) { // por nome: o maior nome da escada contido no nome do cargo
+    const nn = norm(roleName); let best = -1, len = 0;
+    LADDER.forEach((x, k) => { const m = norm(x.name); if (nn.includes(m) && m.length > len) { best = k; len = m.length; } });
+    i = best;
+  }
+  return i;
+}
+function tetoDe(roleName, roleId) {
+  const n = idxDe(roleName, roleId);
   for (const f of TETO) {
     const a = LADDER.findIndex(x => x.name === f.de), b = LADDER.findIndex(x => x.name === f.ate);
     if (n !== -1 && n >= a && n <= b) return f.teto;
@@ -290,18 +299,18 @@ function tetoDe(roleName) {
   return TETO_PALAVRAS.some(p => nn.includes(p)) ? "Patriarca" : null;
 }
 // Toda a CEx (lista SUPER_USERS + Creator/Sub Creator) tem promoção atípica e todas as ações.
-function permDe(nick, roleName) {
+function permDe(nick, roleName, roleId) {
   const sup = isSuper(nick, roleName), n = norm(roleName), g = SGEX.find(x => x.palavras.some(p => n.includes(p)));
   return {
     atipica: sup || /fiscal|diretor/.test(n) || !!(g && g.atipica),
     rebaixar: sup || !!(g && g.acoes.includes("rebaixar")),
     admin: sup || /fiscal|diretor/.test(n),
-    teto: sup ? "Comandante" : tetoDe(roleName),
+    teto: sup ? "Comandante" : tetoDe(roleName, roleId),
     acoes: sup ? ["advertir", "anular", "rebaixar", "exilar", "blacklist"] : (g ? g.acoes : []),
   };
 }
 
-// A patente de quem promove vem da sessão (logada no Roblox), nunca do navegador.
+//A patente de quem promove vem da sessão (logada no Roblox), nunca do navegador.
 // body.toRoleId presente -> só usado se "me" tiver poder total (CEx, SGEx, CR ou SCR);
 // nesse caso pode escolher qualquer patente, inclusive para rebaixar. Sem isso, continua
 // a regra antiga: só sobe uma patente, e só se a patente de quem promove for maior.
@@ -318,7 +327,7 @@ app.post("/api/promote", async (q, s) => {
 
     const meSuper = isSuper(me.nick, mine.name);
     if (!meSuper && isSuper(t.name, cur.name)) return s.json({ error: "Você não pode alterar um membro da CEx." });
-    const perm = permDe(me.nick, mine.name);
+    const perm = permDe(me.nick, mine.name, mine.id);
     const curIdx = LADDER.findIndex(x => x.id === cur.id);
     if (LADDER.some(x => !x.id)) await resolverLadder();
 
@@ -526,7 +535,7 @@ app.post("/auth/bio/check", async (q, s) => {
     bio.delete(c); bioPorId.delete(t.id); // uso único
     const r = await role(t.id); if (!r) return s.json({ error: "Você não está no grupo do jogo." });
     const token = crypto.randomUUID(); sessions.set(token, { id: String(t.id), nick: t.name });
-    s.json({ token, nick: t.name, label: r.name, isSuper: isSuper(t.name, r.name), cfg: CONFIG_USERS.includes(t.name.toLowerCase()), perm: permDe(t.name, r.name) });
+    s.json({ token, nick: t.name, label: r.name, isSuper: isSuper(t.name, r.name), cfg: CONFIG_USERS.includes(t.name.toLowerCase()), perm: permDe(t.name, r.name, r.id) });
   } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
 });
 
@@ -583,7 +592,7 @@ app.post("/api/perfil/inst", wrap(async (q, s, w) => { // instituições além d
 // --- Advertência e Exílio (Rebaixamento e promoções saem por /api/promote)
 app.post("/api/punir", wrap(async (q, s, w) => {
   const tipo = q.body.tipo, nec = { "Advertência": "advertir", "Exílio": "exilar" }[tipo];
-  if (!nec || !permDe(w.nick, w.role.name).acoes.includes(nec)) return s.json(NOPERM);
+  if (!nec || !permDe(w.nick, w.role.name, w.role.id).acoes.includes(nec)) return s.json(NOPERM);
   const motivo = txt(q.body.motivo, 200); if (!motivo) return s.json({ error: "Escreva o motivo." });
   const t = await user(txt(q.body.target, 30)); if (!t) return s.json({ error: "Militar não encontrado." });
   if (String(t.id) === String(w.id)) return s.json({ error: "Você não pode aplicar isso em si mesmo." });
@@ -608,4 +617,4 @@ app.get("/api/audit", wrap((q, s, w) => {
 }));
 
 app.listen(process.env.PORT || 3000);
-      
+                            
