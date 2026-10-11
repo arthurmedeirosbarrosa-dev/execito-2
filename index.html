@@ -148,7 +148,11 @@ main{max-width:760px;margin:0 auto;padding:16px}
       <label for="cNome">Nome do site</label><input id="cNome" maxlength="30">
       <label for="cCor">Cor de destaque</label><input id="cCor" type="color" style="height:46px;padding:4px">
       <label for="cCapa">Foto de capa (link https ou nome do arquivo no site, ex.: capa.jpg)</label><input id="cCapa" placeholder="capa.jpg">
-      <label for="cHook">Webhook do Discord (deixe vazio para manter)</label><input id="cHook" placeholder="https://discord.com/api/webhooks/..." autocomplete="off">
+      <p class="note">Webhooks do Discord (deixe vazio para manter o atual). O endereço é secreto: prefira guardar nas variáveis do Render.</p>
+      <label for="cHP">Canal de Promoções</label><input id="cHP" autocomplete="off" placeholder="https://discord.com/api/webhooks/...">
+      <label for="cHA">Canal de Advertências</label><input id="cHA" autocomplete="off" placeholder="https://discord.com/api/webhooks/...">
+      <label for="cHR">Canal de Rebaixamentos</label><input id="cHR" autocomplete="off" placeholder="https://discord.com/api/webhooks/...">
+      <label for="cHE">Canal de Exílios</label><input id="cHE" autocomplete="off" placeholder="https://discord.com/api/webhooks/...">
       <button id="btnCfg">Salvar</button>
       <button id="btnHook" class="ghost">Enviar teste ao Discord</button>
       <div id="cMsg" class="msg" hidden></div>
@@ -347,19 +351,19 @@ $("btnAud").onclick=audLoad;
 
 /* ---------- Configurações ---------- */
 $("btnHook").onclick=function(){show($("cMsg"),"Enviando teste...");api("/api/config/teste",{}).then(function(d){
-  if(d.error)show($("cMsg"),d.error,1);else show($("cMsg"),"Teste enviado. Confira o canal no Discord.","ok")}).catch(function(){show($("cMsg"),NET,1)})};
+  if(d.error){show($("cMsg"),d.error,1);return}var ok=d.resultados.every(function(r){return r.ok});show($("cMsg"),d.resultados.map(function(r){return r.tipo+": "+(r.ok?"enviado":"FALHOU ("+r.status+")")}).join(" · "),ok?"ok":1)}).catch(function(){show($("cMsg"),NET,1)})};
 function cfgLoad(){
   api("/api/config").then(function(d){
     if(d.error){show($("cMsg"),d.error,1);return}
     $("cMsg").hidden=true;$("cNome").value=d.nome;$("cCor").value=d.cor;$("cCapa").value=d.capa;
-    $("cInfo").textContent="Grupo: "+d.group+" · Chave da API: "+(d.apiKey?"configurada no Render":"FALTANDO no Render")+" · Webhook: "+(d.webhook?"definido":"não definido");
+    $("cInfo").textContent="Grupo: "+d.group+" · Chave da API: "+(d.apiKey?"configurada no Render":"FALTANDO no Render")+" · Canais do Discord: "+["promocao","advertencia","rebaixamento","exilio"].map(function(t){return t+" "+(d.webhooks&&d.webhooks[t]?"ok":"SEM webhook")}).join(", ")+" · Último aviso ao Discord: "+(d.ultimoHook?(d.ultimoHook.ok?"enviado ("+d.ultimoHook.acao+")":"FALHOU ("+(d.ultimoHook.status||d.ultimoHook.erro)+")"):"nenhum desde que o servidor ligou");
   }).catch(function(){show($("cMsg"),NET,1)});
 }
 $("btnCfg").onclick=function(){
-  var b={nome:$("cNome").value,cor:$("cCor").value,capa:$("cCapa").value};if($("cHook").value.trim())b.webhook=$("cHook").value.trim();
+  var b={nome:$("cNome").value,cor:$("cCor").value,capa:$("cCapa").value};b.webhooks={promocao:$("cHP").value.trim(),advertencia:$("cHA").value.trim(),rebaixamento:$("cHR").value.trim(),exilio:$("cHE").value.trim()};
   api("/api/config",b).then(function(d){
     if(d.error){show($("cMsg"),d.error,1);return}
-    $("cHook").value="";aplicarSite({nome:b.nome||"Yso System",cor:b.cor,capa:b.capa});show($("cMsg"),"Configurações salvas.","ok");cfgLoad();
+    ["cHP","cHA","cHR","cHE"].forEach(function(i){$(i).value=""});aplicarSite({nome:b.nome||"Yso System",cor:b.cor,capa:b.capa});show($("cMsg"),"Configurações salvas.","ok");cfgLoad();
   }).catch(function(){show($("cMsg"),NET,1)});
 };
 
