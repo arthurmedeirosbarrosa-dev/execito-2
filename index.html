@@ -150,6 +150,7 @@ main{max-width:760px;margin:0 auto;padding:16px}
       <label for="cCapa">Foto de capa (link https ou nome do arquivo no site, ex.: capa.jpg)</label><input id="cCapa" placeholder="capa.jpg">
       <label for="cHook">Webhook do Discord (deixe vazio para manter)</label><input id="cHook" placeholder="https://discord.com/api/webhooks/..." autocomplete="off">
       <button id="btnCfg">Salvar</button>
+      <button id="btnHook" class="ghost">Enviar teste ao Discord</button>
       <div id="cMsg" class="msg" hidden></div>
     </section>
   </main>
@@ -203,11 +204,11 @@ function menu(o){$("menu").classList.toggle("open",o);$("bg").hidden=!o}
 $("btnMenu").onclick=function(){menu(!$("menu").classList.contains("open"))};
 $("bg").onclick=function(){menu(false)};
 var LOAD={perfil:function(){perfilLoad()},efetivo:function(){efLoad()},ativ:function(){ativInit()},aud:function(){audLoad()},cfg:function(){cfgLoad()}};
-function go(p){
+function go(p,skip){
   menu(false);
   document.querySelectorAll("#menu [data-p]").forEach(function(b){b.classList.toggle("on",b.dataset.p===p)});
   ["perfil","efetivo","ativ","aud","cfg"].forEach(function(x){$("p-"+x).hidden=(x!==p)});
-  if(LOAD[p])LOAD[p]();
+  if(LOAD[p]&&!skip)LOAD[p]();
 }
 document.querySelectorAll("#menu [data-p]").forEach(function(b){b.onclick=function(){go(b.dataset.p)}});
 function render(){
@@ -229,9 +230,11 @@ function cdpTxt(c){
   var m=Math.ceil(c.restanteMs/60000),h=Math.floor(m/60);
   return"CDP para "+c.proxima+": falta "+(h?h+"h ":"")+(m%60)+"min.";
 }
+var PF=0;
 function perfilLoad(n){
-  var box=$("perfilBox");box.innerHTML='<p class="note">Carregando perfil...</p>';
+  var box=$("perfilBox"),eu=++PF;box.innerHTML='<p class="note">Carregando perfil...</p>';
   api("/api/perfil"+(n?"?nick="+encodeURIComponent(n):"")).then(function(d){
+    if(eu!==PF)return;
     if(d.error){box.innerHTML='<div class="msg err">'+esc(d.error)+"</div>";return}
     var D=d.disciplina,li=function(a){return a.map(function(x){return"<li><strong>"+esc(x.tipo)+"</strong> · "+esc(x.motivo||"sem motivo")+(x.para?" ("+esc(x.de)+" → "+esc(x.para)+")":"")+"<small>por "+esc(x.por)+" · "+dt(x.data)+"</small></li>"}).join("")};
     var h='<div class="card hd">'+(d.avatar?'<img class="pic" src="'+esc(d.avatar)+'" alt="">':"")+"<div><h2 style='margin:0 0 6px'>"+esc(d.nick)+'</h2><span class="tag">'+esc(d.patente||"Fora do grupo")+'</span><div class="kv"><span>ID Roblox</span><b>'+esc(d.id)+"</b><span>Discord</span><b>"+(esc(d.discord)||"não registrado")+"</b></div></div></div>";
@@ -277,7 +280,7 @@ function efDraw(){
     document.querySelectorAll("#eList img[data-id]").forEach(function(i){if(o[i.dataset.id])i.src=o[i.dataset.id]})}).catch(function(){});
 }
 $("eRank").onchange=efDraw;$("eQ").oninput=efDraw;
-$("eList").onclick=function(ev){var li=ev.target.closest("li");if(li){go("perfil");perfilLoad(li.dataset.n)}};
+$("eList").onclick=function(ev){var li=ev.target.closest("li");if(li){go("perfil",true);perfilLoad(li.dataset.n)}};
 
 /* ---------- Atividades ---------- */
 var ACTS=[
@@ -343,6 +346,8 @@ function audLoad(){
 $("btnAud").onclick=audLoad;
 
 /* ---------- Configurações ---------- */
+$("btnHook").onclick=function(){show($("cMsg"),"Enviando teste...");api("/api/config/teste",{}).then(function(d){
+  if(d.error)show($("cMsg"),d.error,1);else show($("cMsg"),"Teste enviado. Confira o canal no Discord.","ok")}).catch(function(){show($("cMsg"),NET,1)})};
 function cfgLoad(){
   api("/api/config").then(function(d){
     if(d.error){show($("cMsg"),d.error,1);return}
