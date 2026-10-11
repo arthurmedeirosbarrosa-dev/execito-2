@@ -123,8 +123,13 @@ function persist() {
 // Auditoria: quem fez, o quê, quando e de qual IP.
 function audit(q, quem, acao, detalhe) {
   const ip = q ? String(q.headers["x-forwarded-for"] || q.socket.remoteAddress || "").split(",")[0].trim() : "sistema";
-  if (db.config.webhook) fetch(db.config.webhook, { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content: `**${acao}** — ${detalhe} (por ${quem})`.slice(0, 1900) }) }).catch(() => {});
+  const hook = db.config.webhook || process.env.DISCORD_WEBHOOK; // webhook salvo em Configurações ou na variável DISCORD_WEBHOOK do Render
+  if (hook && acao !== "Configuração") {
+    const cor = /^Promoção/.test(acao) ? 0x39ff88 : /Rebaixamento|Advertência|Exílio/.test(acao) ? 0xff5555 : 0x5b8def;
+    fetch(hook, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "Yso System", embeds: [{ title: acao, description: String(detalhe).slice(0, 1500), color: cor,
+        fields: [{ name: "Por", value: String(quem).slice(0, 60), inline: true }], timestamp: new Date().toISOString() }] }) }).catch(() => {});
+  }
   db.audit.push({ quem, acao, detalhe, ip, data: new Date().toISOString() });
   if (db.audit.length > 2000) db.audit.shift();
   persist();
