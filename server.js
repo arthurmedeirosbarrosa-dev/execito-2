@@ -370,17 +370,26 @@ app.post("/api/promote", async (q, s) => {
       }
     }
 
-    const r = await fetch(`https://apis.roblox.com/cloud/v2/groups/${GROUP}/memberships/${t.id}`, {
-      method: "PATCH", headers: { "x-api-key": KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ role: `groups/${GROUP}/roles/${next.id}` })
-    });
+    // O CDP começa AGORA, no momento do clique (sem esperar o Roblox). Se o Roblox recusar, volta como estava.
+    const baixou = LADDER.findIndex(x => x.id === next.id) < curIdx;
+    const marcar = !atipicaUsada && !baixou; // só Promoção Normal inicia CDP
+    const antes = lastPromo.get(String(t.id));
+    if (marcar) { lastPromo.set(String(t.id), Date.now()); persist(); }
+    const desfazer = () => { if (marcar) { if (antes) lastPromo.set(String(t.id), antes); else lastPromo.delete(String(t.id)); persist(); } };
+
+    let r;
+    try {
+      r = await fetch(`https://apis.roblox.com/cloud/v2/groups/${GROUP}/memberships/${t.id}`, {
+        method: "PATCH", headers: { "x-api-key": KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ role: `groups/${GROUP}/roles/${next.id}` })
+      });
+    } catch (e) { desfazer(); throw e; }
     if (!r.ok) {
+      desfazer();
       const detail = await r.text().catch(() => "");
       return s.json({ error: `O Roblox recusou (status ${r.status}): ${detail.slice(0, 300)}` });
     }
 
-    const baixou = LADDER.findIndex(x => x.id === next.id) < curIdx;
-    if (!atipicaUsada && !baixou) lastPromo.set(String(t.id), Date.now()); // CDP automático (só Promoção Normal)
     db.hist.push({ id: t.id, nick: t.name, from: cur.name, to: next.name, by: me.nick, date: new Date().toISOString() });
     const tipoAcao = baixou ? "Rebaixamento" : (atipicaUsada ? "Promoção Atípica" : "Promoção Normal");
     if (baixou) { const f = db.fichas[t.id] || (db.fichas[t.id] = { estado: "Ativo", registros: [] });
