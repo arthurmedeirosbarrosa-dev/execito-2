@@ -721,6 +721,16 @@ app.get("/api/cargos", async (q, s) => {
   } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
 });
 
+// --- Diagnóstico de login (público, sem dados de pessoas): mostra se o servidor está na versão nova e como o Roblox responde.
+app.get("/api/diag", async (q, s) => {
+  const out = { versao: "login-4", logins_ok: loginsOk, ultimas_falhas: falhasLogin.slice(-10).reverse().map(x => ({ quando: x.quando, onde: x.onde, motivo: x.motivo })),
+    chave_api_definida: !!KEY, client_id_definido: !!CID, client_secret_definido: !!CSECRET, redirect_uri: REDIRECT_URI || null, site_de_volta: SITE };
+  try { const r = await fetch(`https://apis.roblox.com/cloud/v2/groups/${GROUP}/memberships?maxPageSize=1&filter=${encodeURIComponent("user == 'users/1'")}`, { headers: { "x-api-key": KEY || "" } });
+    out.cloud_status = r.status; out.cloud_resposta = (await r.text()).slice(0, 220); } catch (e) { out.cloud_status = "erro: " + e.message; }
+  try { const r = await fetch("https://groups.roblox.com/v2/users/1/groups/roles"); out.publico_status = r.status; } catch (e) { out.publico_status = "erro: " + e.message; }
+  s.json(out);
+});
+
 process.on("unhandledRejection", e => console.log("Erro não tratado:", e && e.message));
 process.on("uncaughtException", e => console.log("Erro inesperado:", e && e.message));
 
