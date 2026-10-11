@@ -310,17 +310,24 @@ function permDe(nick, roleName, roleId) {
   };
 }
 
-//A patente de quem promove vem da sessão (logada no Roblox), nunca do navegador.
+// A patente de quem promove vem da sessão (logada no Roblox), nunca do navegador.
 // body.toRoleId presente -> só usado se "me" tiver poder total (CEx, SGEx, CR ou SCR);
 // nesse caso pode escolher qualquer patente, inclusive para rebaixar. Sem isso, continua
 // a regra antiga: só sobe uma patente, e só se a patente de quem promove for maior.
+const trabalhando = new Set();
 app.post("/api/promote", async (q, s) => {
   try {
     const me = sessions.get(q.body.token);
     if (!me) return s.json({ error: "Sessão inválida. Entre de novo." });
     const t = await user(q.body.target);
     if (!t) return s.json({ error: "Militar não encontrado." });
-    if (t.id === me.id) return s.json({ error: "Você não pode promover a si mesmo." });
+    if (String(t.id) === String(me.id)) return s.json({ error: "Você não pode promover a si mesmo." });
+    // Trava por militar: só uma ação por vez (impede o "spam" de cliques/requisições simultâneas).
+    const chave = String(t.id);
+    if (trabalhando.has(chave)) return s.json({ error: "Já tem uma ação em andamento para esse militar. Aguarde." });
+    trabalhando.add(chave);
+    const soltar = () => trabalhando.delete(chave);
+    s.on("finish", soltar); s.on("close", soltar);
 
     const [mine, cur] = await Promise.all([role(me.id), role(t.id)]);
     if (!mine || !cur) return s.json({ error: "Os dois precisam estar no grupo." });
@@ -617,4 +624,3 @@ app.get("/api/audit", wrap((q, s, w) => {
 }));
 
 app.listen(process.env.PORT || 3000);
-                            
