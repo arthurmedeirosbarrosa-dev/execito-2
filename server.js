@@ -97,6 +97,9 @@ const SITE = (SITE_ORIGIN && !/claude\./i.test(SITE_ORIGIN)) ? SITE_ORIGIN : "ht
 const firmar = v => crypto.createHmac("sha256", String(CSECRET || "yso-state")).update(v).digest("hex").slice(0, 24);
 const novoState = () => { const v = Date.now().toString(36) + "." + crypto.randomBytes(6).toString("hex"); return v + "." + firmar(v); };
 const stateOk = st => { const p = String(st || "").split("."); return p.length === 3 && firmar(p[0] + "." + p[1]) === p[2] && Date.now() - parseInt(p[0], 36) < 30 * 60000; };
+// Registro dos problemas de login (aparece em Configurações) para descobrir por que alguém não entrou.
+const falhasLogin = []; let loginsOk = 0;
+const falha = (onde, motivo, nick) => { falhasLogin.push({ quando: new Date().toISOString(), onde, motivo: String(motivo).slice(0, 200), nick: nick || "" }); if (falhasLogin.length > 50) falhasLogin.shift(); console.log("Falha de login:", onde, motivo); };
 const pending  = new Map();   // state  -> return URL (anti-CSRF do login)
 const oneTime  = new Map();   // authcode -> token (troca única depois do redirect)
 
@@ -169,6 +172,8 @@ a{display:inline-block;margin-top:16px;padding:11px 18px;border:1px solid #39ff8
 app.get("/auth/callback", async (q, s) => {
   try {
     const { code, state } = q.query;
+    if (q.query.error) { falha("callback", "Roblox devolveu: " + q.query.error + " " + (q.query.error_description || "")); return s.status(400).send(aviso("O login foi cancelado ou recusado no Roblox. Tente de novo.")); }
+    if (!stateOk(state)) { falha("callback", "state inválido ou vencido"); }
     if (!stateOk(state)) return s.status(400).send(aviso("Login expirado. Volte ao site e tente de novo."));
 
     const tok = await j("https://apis.roblox.com/oauth/v1/token", {
@@ -179,7 +184,7 @@ app.get("/auth/callback", async (q, s) => {
         grant_type: "authorization_code", code, redirect_uri: REDIRECT_URI
       })
     });
-    if (!tok.access_token) return s.status(400).send(aviso("O Roblox recusou o login."));
+    if (!tok.access_token) { const mot = String(tok.error || "sem detalhe").replace(/[^\w .-]/g, "").slice(0, 60); falha("token", mot + " " + String(tok.error_description || "").slice(0, 100)); return s.status(400).send(aviso("O Roblox recusou o login (" + mot + ").")); }
 
     const me = await j("https://apis.roblox.com/oauth/v1/userinfo", {
       headers: { Authorization: "Bearer " + tok.access_token }
@@ -196,7 +201,7 @@ app.get("/auth/callback", async (q, s) => {
     const volta = new URL(SITE);
     volta.searchParams.set("authcode", authcode);
     s.redirect(volta.toString());
-  } catch (e) { s.status(500).send(aviso("Falha ao falar com o Roblox. Tente de novo em instantes.")); }
+  } catch (e) { falha("callback", e.message); s.status(500).send(aviso("Falha ao falar com o Roblox. Tente de novo em instantes.")); }
 });
 
 // Foto de perfil (headshot) do Roblox para um ID de usuário.
@@ -226,13 +231,14 @@ app.get("/api/session", async (q, s) => {
     const session = oneTime.get(q.query.code);
     oneTime.delete(q.query.code);
     const me = session && sessions.get(session);
-    if (!me) return s.json({ error: "Login expirado, entre de novo." });
+    if (!me) { falha("sessão", "código vencido, já usado ou servidor reiniciou"); return s.json({ error: "Login expirado, entre de novo." }); }
     const r = await role(me.id);
-    if (!r) return s.json({ error: "Você não está no grupo do jogo." });
+    if (!r) { falha("sessão", "não está no grupo do jogo", me.nick); return s.json({ error: "Você não está no grupo do jogo." }); }
     const sup = isSuper(me.nick, r.name);
+    loginsOk++;
     s.json({ token: session, nick: me.nick, label: r.name, isSuper: sup, cfg: CONFIG_USERS.includes(me.nick.toLowerCase()),
              perm: permDe(me.nick, r.name, r.id), avatar: await avatar(me.id), cdp: cdpInfo(me.id, r.id, sup) });
-  } catch (e) { s.json({ error: "O Roblox está sobrecarregado agora. Espere 1 minuto e entre de novo." }); }
+  } catch (e) { falha("sessão", e.message); s.json({ error: "O Roblox está sobrecarregado agora. Espere 1 minuto e entre de novo." }); }
 });
 
 // Atualiza o cabeçalho (patente + CDP) sem precisar logar de novo. O site chama a cada ~30s.
@@ -585,7 +591,7 @@ app.post("/auth/bio/check", async (q, s) => {
 // --- Visual do site (público): nome, cor e capa. Quem edita é CONFIG_USERS.
 app.get("/api/site", (q, s) => s.json({ nome: db.config.nome || "Yso System", cor: db.config.cor || "#39ff88", capa: db.config.capa || "capa.jpg" }));
 app.get("/api/config", wrap((q, s, w) => CONFIG_USERS.includes(w.nick.toLowerCase())
-  ? s.json({ nome: db.config.nome || "Yso System", cor: db.config.cor || "#39ff88", capa: db.config.capa || "capa.jpg", webhooks: statusHooks(), ultimoHook, group: GROUP, apiKey: !!KEY }) : s.json(NOPERM)));
+  ? s.json({ nome: db.config.nome || "Yso System", cor: db.config.cor || "#39ff88", capa: db.config.capa || "capa.jpg", webhooks: statusHooks(), ultimoHook, login: { ok: loginsOk, falhas: falhasLogin.slice(-15).reverse() }, group: GROUP, apiKey: !!KEY }) : s.json(NOPERM)));
 app.post("/api/config", wrap((q, s, w) => {
   if (!CONFIG_USERS.includes(w.nick.toLowerCase())) return s.json(NOPERM);
   const b = q.body, c = db.config;
