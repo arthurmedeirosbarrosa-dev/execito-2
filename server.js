@@ -44,6 +44,16 @@ const LADDER = [
   { id: null, name: "Soberano" },
   { id: 715223052, name: "Subcomandante" },
   { id: 713051207, name: "Comandante" },
+  // Cargos acima do Alto Escalão (IDs preenchidos sozinhos pelo nome do cargo no grupo)
+  { id: null, name: "Vice Presidente" },
+  { id: null, name: "Presidente" },
+  { id: null, name: "Investidor" },
+  { id: null, name: "Sócios" },
+  { id: null, name: "Developer" },
+  { id: null, name: "Estagiário Administrativo" },
+  { id: null, name: "Fiscal Administrativo" },
+  { id: null, name: "Diretor Administrativo" },
+  { id: null, name: "Diretor Geral Administrativo" },
 ];
 // CDP (tempo de espera) para ser promovido AO cargo indicado, em horas.
 // Recruta não tem CDP. Os Oficiais Soberanos (Sub-Patriarca, Patriarca, Soberano) não entram
@@ -255,7 +265,7 @@ const norm = x => String(x || "").toLowerCase().normalize("NFD").replace(/[\u030
 async function resolverLadder() { // acha o ID dos cargos sem ID (Soberanos) pelo nome, direto no grupo
   try {
     const d = await j(`https://groups.roblox.com/v1/groups/${GROUP}/roles`);
-    LADDER.forEach(e => { if (!e.id) { const r = (d.roles || []).find(x => norm(x.name) === norm(e.name)); if (r) e.id = r.id; } });
+    LADDER.forEach(e => { if (!e.id) { const limpa = x => norm(x).replace(/^\[[^\]]*\]\s*/, "").trim(); const r = (d.roles || []).find(x => limpa(x.name) === limpa(e.name)); if (r) e.id = r.id; } });
   } catch (e) {}
 }
 resolverLadder();
@@ -270,7 +280,7 @@ const TETO = [
 // Cargos fora da escada que também chegam até Patriarca (procura a palavra no nome do cargo).
 const TETO_PALAVRAS = ["presidente", "investidor", "socio"];
 // Só a administração (Fiscal para cima) e a CEx entregam estes cargos.
-const ADM_ONLY = ["Subcomandante", "Comandante"];
+const ADM_ONLY = ["Subcomandante", "Comandante", "Vice Presidente", "Presidente", "Investidor", "Sócios"];
 // SGEx por palavra no nome do cargo, do maior para o menor (vale o primeiro que bater).
 const SGEX = [
   { palavras: ["diretor"], acoes: ["advertir", "anular", "rebaixar", "exilar", "blacklist"], atipica: true },  // Vice Diretor+
@@ -631,5 +641,21 @@ app.get("/api/audit", wrap((q, s, w) => {
   if (dia.test(ate || "")) l = l.filter(x => x.data <= new Date(ate + "T23:59:59").toISOString());
   s.json(l.slice(-300).reverse().map(x => w.sup ? x : { ...x, ip: undefined }));
 }));
+
+// --- Diagnóstico público: quais cargos da lista existem no grupo do Roblox (só nomes de cargos, que já são públicos).
+app.get("/api/cargos", async (q, s) => {
+  try {
+    await resolverLadder();
+    const d = await j(`https://groups.roblox.com/v1/groups/${GROUP}/roles`);
+    const grupo = (d.roles || []).map(x => ({ id: x.id, nome: x.name, rank: x.rank }));
+    const ids = new Set(LADDER.filter(x => x.id).map(x => String(x.id)));
+    s.json({
+      encontrados: LADDER.filter(x => x.id).map(x => x.name),
+      NAO_ENCONTRADOS: LADDER.filter(x => !x.id).map(x => x.name),
+      cargos_do_grupo_fora_da_lista: grupo.filter(x => !ids.has(String(x.id))).map(x => x.nome),
+      total_no_grupo: grupo.length,
+    });
+  } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
+});
 
 app.listen(process.env.PORT || 3000);
