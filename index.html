@@ -83,6 +83,17 @@ main{max-width:760px;margin:0 auto;padding:16px}
       <h2>Entrar</h2>
       <p class="note">Você entra pela sua conta oficial do Roblox. A senha é digitada lá, nunca aqui.</p>
       <a id="btnRblx" class="btn" href="#">Entrar com Roblox</a>
+      <details style="margin-top:18px"><summary class="note" style="cursor:pointer">Não consegue entrar? Use o Bio-Code</summary>
+        <p class="note">1) Digite seu nick e gere o código. 2) Cole o código na <strong>descrição (bio)</strong> do seu perfil no Roblox e salve. 3) Volte aqui e toque em Verificar.</p>
+        <label for="bNick">Nick do Roblox</label>
+        <input id="bNick" autocomplete="off" placeholder="Seu nick">
+        <button id="btnGerar">Gerar código</button>
+        <div id="bioBox" hidden>
+          <div class="code" id="bioCode"></div>
+          <p class="note" id="bioTimer"></p>
+          <button id="btnVerif">Verificar e entrar</button>
+        </div>
+      </details>
       <div id="lMsg" class="msg" hidden></div>
     </div>
   </div>
@@ -202,6 +213,30 @@ $("btnRblx").onclick=function(){show($("lMsg"),"Abrindo o Roblox... se demorar, 
     DB.me={token:d.token,nick:d.nick,label:d.label,isSuper:d.isSuper,cfg:d.cfg,perm:d.perm};save();render();
   }).catch(function(){show($("lMsg"),NET,1)});
 })();
+/* ---------- login por Bio-Code (alternativa) ---------- */
+var bioT=null;
+$("btnGerar").onclick=function(){
+  var n=$("bNick").value.trim(),m=$("lMsg");
+  if(!n){show(m,"Digite seu nick do Roblox.",1);return}
+  show(m,"Gerando código...");
+  fetch(API+"/auth/bio/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nick:n})})
+  .then(function(r){return r.json()}).then(function(d){
+    if(d.error){show(m,d.error,1);return}
+    m.hidden=true;$("bioBox").hidden=false;$("bioCode").textContent=d.codigo;$("bNick").value=d.nick;
+    var fim=Date.now()+d.segundos*1000;clearInterval(bioT);
+    bioT=setInterval(function(){var s=Math.max(0,Math.round((fim-Date.now())/1000));
+      $("bioTimer").textContent=s?"O código expira em "+Math.floor(s/60)+":"+("0"+s%60).slice(-2)+". Cole na bio do Roblox e salve.":"Código expirado. Gere um novo.";
+      if(!s)clearInterval(bioT)},1000);
+  }).catch(function(){show(m,NET,1)});
+};
+$("btnVerif").onclick=function(){
+  var m=$("lMsg");show(m,"Verificando sua bio...");
+  fetch(API+"/auth/bio/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nick:$("bNick").value.trim()})})
+  .then(function(r){return r.json()}).then(function(d){
+    if(d.error){show(m,d.error,1);return}
+    clearInterval(bioT);DB.me={token:d.token,nick:d.nick,label:d.label,isSuper:d.isSuper,cfg:d.cfg,perm:d.perm};save();render();
+  }).catch(function(){show(m,NET,1)});
+};
 $("btnOut").onclick=function(){DB.me=null;save();render()};
 
 /* ---------- navegação ---------- */
