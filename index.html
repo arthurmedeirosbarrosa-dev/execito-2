@@ -308,7 +308,9 @@ function prevLoad(){
   }).catch(function(){b.innerHTML='<span class="note">'+NET+"</span>"});
 }
 $("btnBusca").onclick=prevLoad;$("aNick").onkeydown=function(e){if(e.key==="Enter")prevLoad()};
+var BUSY=false;
 $("btnAct").onclick=function(){
+  if(BUSY)return;
   var m=$("aMsg"),n=$("aNick").value.trim(),mot=$("aMot").value.trim(),k=ACT.k;
   if(!n){show(m,"Digite o nick do militar.",1);return}
   if(ACT.mot&&k!=="atipica"&&!mot){show(m,"Escreva o motivo.",1);return}
@@ -317,12 +319,13 @@ $("btnAct").onclick=function(){
   if(k==="atipica"){b.toRoleId=$("aRole").value;b.motivo=mot}
   else if(k==="reb"){b.rebaixar=true;b.motivo=mot}
   else if(k==="adv"||k==="exil"){p="/api/punir";b={target:n,tipo:k==="adv"?"Advertência":"Exílio",motivo:mot}}
-  show(m,"Aplicando...");
+  show(m,"Aplicando...");BUSY=true;$("btnAct").disabled=true;
   api(p,b).then(function(d){
+    BUSY=false;$("btnAct").disabled=false;
     if(d.error){show(m,d.error,1);return}
     show(m,d.from?d.nick+": "+d.from+" → "+d.to+"."+(d.note?" Atenção: "+d.note:""):(d.aviso||"Aplicado com sucesso."),"ok");
     $("aMot").value="";$("aTr").checked=false;prevLoad();
-  }).catch(function(){show(m,NET,1)});
+  }).catch(function(){BUSY=false;$("btnAct").disabled=false;show(m,NET,1)});
 };
 
 /* ---------- Auditoria ---------- */
