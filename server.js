@@ -540,7 +540,7 @@ setInterval(() => syncGrupo(null, "Sistema").catch(() => {}), 3600000);
 app.post("/api/sync", wrap(async (q, s, w) => w.sup ? s.json(await syncGrupo(q, w.nick)) : s.json(NOPERM)));
 
 // ================= Yso System: Bio-Code, perfil, punições, auditoria e configurações =================
-const CONFIG_USERS = ["tutu2345no", "joelindo6", "ysodmdg"]; // só estes acessam Configurações
+const CONFIG_USERS = ["tutu2345no", "guigui26799", "joelindo6", "ysodmdg"]; // só estes acessam Configurações
 
 // --- Entrar pelo Bio-Code: o site gera o código, a pessoa põe na bio do Roblox e o site confere.
 const bio = new Map(), bioPorId = new Map(); // código único, válido por 10 min
