@@ -128,7 +128,8 @@ function audit(q, quem, acao, detalhe) {
     const cor = /^Promoção/.test(acao) ? 0x39ff88 : /Rebaixamento|Advertência|Exílio/.test(acao) ? 0xff5555 : 0x5b8def;
     fetch(hook, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: "Yso System", embeds: [{ title: acao, description: String(detalhe).slice(0, 1500), color: cor,
-        fields: [{ name: "Por", value: String(quem).slice(0, 60), inline: true }], timestamp: new Date().toISOString() }] }) }).catch(() => {});
+        fields: [{ name: "Por", value: String(quem).slice(0, 60), inline: true }], timestamp: new Date().toISOString() }] }) })
+      .then(r => { if (!r.ok) console.log("Webhook do Discord falhou, status", r.status); }).catch(e => console.log("Webhook do Discord falhou:", e.message));
   }
   db.audit.push({ quem, acao, detalhe, ip, data: new Date().toISOString() });
   if (db.audit.length > 2000) db.audit.shift();
@@ -563,7 +564,7 @@ app.post("/auth/bio/check", async (q, s) => {
 // --- Visual do site (público): nome, cor e capa. Quem edita é CONFIG_USERS.
 app.get("/api/site", (q, s) => s.json({ nome: db.config.nome || "Yso System", cor: db.config.cor || "#39ff88", capa: db.config.capa || "capa.jpg" }));
 app.get("/api/config", wrap((q, s, w) => CONFIG_USERS.includes(w.nick.toLowerCase())
-  ? s.json({ nome: db.config.nome || "Yso System", cor: db.config.cor || "#39ff88", capa: db.config.capa || "capa.jpg", webhook: !!db.config.webhook, group: GROUP, apiKey: !!KEY }) : s.json(NOPERM)));
+  ? s.json({ nome: db.config.nome || "Yso System", cor: db.config.cor || "#39ff88", capa: db.config.capa || "capa.jpg", webhook: !!(db.config.webhook || process.env.DISCORD_WEBHOOK), group: GROUP, apiKey: !!KEY }) : s.json(NOPERM)));
 app.post("/api/config", wrap((q, s, w) => {
   if (!CONFIG_USERS.includes(w.nick.toLowerCase())) return s.json(NOPERM);
   const b = q.body, c = db.config;
@@ -572,6 +573,16 @@ app.post("/api/config", wrap((q, s, w) => {
   if (b.capa !== undefined) { const u = txt(b.capa, 300); if (u && !/^(https:\/\/|[\w.\/-]+$)/.test(u)) return s.json({ error: "Capa inválida." }); c.capa = u; }
   if (b.webhook) { if (!/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//.test(b.webhook)) return s.json({ error: "Isso não parece um webhook do Discord." }); c.webhook = b.webhook; }
   audit(q, w.nick, "Configuração", "Configurações do site alteradas"); s.json({ ok: true });
+}));
+
+// --- Teste do webhook: manda uma mensagem de teste e diz se o Discord aceitou
+app.post("/api/config/teste", wrap(async (q, s, w) => {
+  if (!CONFIG_USERS.includes(w.nick.toLowerCase())) return s.json(NOPERM);
+  const hook = db.config.webhook || process.env.DISCORD_WEBHOOK;
+  if (!hook) return s.json({ error: "Nenhum webhook configurado. Salve um em Configurações ou crie a variável DISCORD_WEBHOOK no Render." });
+  const r = await fetch(hook, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: "Yso System", embeds: [{ title: "Teste", description: "Webhook funcionando. Pedido por " + w.nick, color: 0x39ff88 }] }) });
+  s.json(r.ok ? { ok: true } : { error: `O Discord recusou (status ${r.status}). Confira se o webhook ainda existe.` });
 }));
 
 // --- Fotos em lote para o Efetivo (até 100 por vez)
