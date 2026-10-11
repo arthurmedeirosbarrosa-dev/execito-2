@@ -121,15 +121,23 @@ function persist() {
   saving = setTimeout(() => pool && pool.query("insert into kv values('db',$1) on conflict (k) do update set v=$1", [JSON.stringify(db)]).catch(() => {}), 500);
 }
 // Auditoria: quem fez, o quê, quando e de qual IP.
+// Um canal do Discord para cada tipo de ação. Os endereços ficam nas variáveis do Render (nunca no código:
+// o repositório é público) ou em Configurações. Se faltar o do tipo, usa o webhook geral (DISCORD_WEBHOOK).
+const HOOK_ENV = { promocao: "DISCORD_WEBHOOK_PROMOCOES", advertencia: "DISCORD_WEBHOOK_ADVERTENCIA", rebaixamento: "DISCORD_WEBHOOK_REBAIXAMENTO", exilio: "DISCORD_WEBHOOK_EXILIO" };
+const tipoHook = acao => /^Promoção/.test(acao) ? "promocao" : acao === "Advertência" ? "advertencia" : acao === "Rebaixamento" ? "rebaixamento" : acao === "Exílio" ? "exilio" : null;
+const hookUrl = tipo => ((db.config.webhooks || {})[tipo]) || process.env[HOOK_ENV[tipo]] || db.config.webhook || process.env.DISCORD_WEBHOOK || "";
+const statusHooks = () => Object.fromEntries(Object.keys(HOOK_ENV).map(t => [t, !!hookUrl(t)]));
+let ultimoHook = null; // resultado do último aviso ao Discord (aparece em Configurações)
 function audit(q, quem, acao, detalhe) {
   const ip = q ? String(q.headers["x-forwarded-for"] || q.socket.remoteAddress || "").split(",")[0].trim() : "sistema";
-  const hook = db.config.webhook || process.env.DISCORD_WEBHOOK; // webhook salvo em Configurações ou na variável DISCORD_WEBHOOK do Render
-  if (hook && acao !== "Configuração") {
+  const tipoH = tipoHook(acao), hook = tipoH && hookUrl(tipoH);
+  if (hook) {
     const cor = /^Promoção/.test(acao) ? 0x39ff88 : /Rebaixamento|Advertência|Exílio/.test(acao) ? 0xff5555 : 0x5b8def;
     fetch(hook, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: "Yso System", embeds: [{ title: acao, description: String(detalhe).slice(0, 1500), color: cor,
         fields: [{ name: "Por", value: String(quem).slice(0, 60), inline: true }], timestamp: new Date().toISOString() }] }) })
-      .then(r => { if (!r.ok) console.log("Webhook do Discord falhou, status", r.status); }).catch(e => console.log("Webhook do Discord falhou:", e.message));
+      .then(r => { ultimoHook = { ok: r.ok, status: r.status, acao, quando: new Date().toISOString() }; if (!r.ok) console.log("Webhook do Discord falhou, status", r.status); })
+      .catch(e => { ultimoHook = { ok: false, erro: e.message, acao, quando: new Date().toISOString() }; console.log("Webhook do Discord falhou:", e.message); });
   }
   db.audit.push({ quem, acao, detalhe, ip, data: new Date().toISOString() });
   if (db.audit.length > 2000) db.audit.shift();
@@ -564,7 +572,7 @@ app.post("/auth/bio/check", async (q, s) => {
 // --- Visual do site (público): nome, cor e capa. Quem edita é CONFIG_USERS.
 app.get("/api/site", (q, s) => s.json({ nome: db.config.nome || "Yso System", cor: db.config.cor || "#39ff88", capa: db.config.capa || "capa.jpg" }));
 app.get("/api/config", wrap((q, s, w) => CONFIG_USERS.includes(w.nick.toLowerCase())
-  ? s.json({ nome: db.config.nome || "Yso System", cor: db.config.cor || "#39ff88", capa: db.config.capa || "capa.jpg", webhook: !!(db.config.webhook || process.env.DISCORD_WEBHOOK), group: GROUP, apiKey: !!KEY }) : s.json(NOPERM)));
+  ? s.json({ nome: db.config.nome || "Yso System", cor: db.config.cor || "#39ff88", capa: db.config.capa || "capa.jpg", webhooks: statusHooks(), ultimoHook, group: GROUP, apiKey: !!KEY }) : s.json(NOPERM)));
 app.post("/api/config", wrap((q, s, w) => {
   if (!CONFIG_USERS.includes(w.nick.toLowerCase())) return s.json(NOPERM);
   const b = q.body, c = db.config;
@@ -572,17 +580,27 @@ app.post("/api/config", wrap((q, s, w) => {
   if (b.cor !== undefined) { if (!/^#[0-9a-f]{6}$/i.test(b.cor)) return s.json({ error: "Cor inválida (use #39ff88)." }); c.cor = b.cor; }
   if (b.capa !== undefined) { const u = txt(b.capa, 300); if (u && !/^(https:\/\/|[\w.\/-]+$)/.test(u)) return s.json({ error: "Capa inválida." }); c.capa = u; }
   if (b.webhook) { if (!/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//.test(b.webhook)) return s.json({ error: "Isso não parece um webhook do Discord." }); c.webhook = b.webhook; }
+  if (b.webhooks && typeof b.webhooks === "object") {
+    c.webhooks = c.webhooks || {};
+    for (const t of Object.keys(HOOK_ENV)) { const u = txt(b.webhooks[t], 300); if (!u) continue;
+      if (!/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//.test(u)) return s.json({ error: "Webhook de " + t + " não parece um webhook do Discord." }); c.webhooks[t] = u; }
+  }
   audit(q, w.nick, "Configuração", "Configurações do site alteradas"); s.json({ ok: true });
 }));
 
 // --- Teste do webhook: manda uma mensagem de teste e diz se o Discord aceitou
 app.post("/api/config/teste", wrap(async (q, s, w) => {
   if (!CONFIG_USERS.includes(w.nick.toLowerCase())) return s.json(NOPERM);
-  const hook = db.config.webhook || process.env.DISCORD_WEBHOOK;
-  if (!hook) return s.json({ error: "Nenhum webhook configurado. Salve um em Configurações ou crie a variável DISCORD_WEBHOOK no Render." });
-  const r = await fetch(hook, { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: "Yso System", embeds: [{ title: "Teste", description: "Webhook funcionando. Pedido por " + w.nick, color: 0x39ff88 }] }) });
-  s.json(r.ok ? { ok: true } : { error: `O Discord recusou (status ${r.status}). Confira se o webhook ainda existe.` });
+  const res = [];
+  for (const t of Object.keys(HOOK_ENV)) {
+    const u = hookUrl(t); if (!u) { res.push({ tipo: t, ok: false, status: "sem webhook" }); continue; }
+    try {
+      const r = await fetch(u, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: "Yso System", embeds: [{ title: "Teste", description: "Canal de " + t + " funcionando. Pedido por " + w.nick, color: 0x39ff88 }] }) });
+      res.push({ tipo: t, ok: r.ok, status: r.status });
+    } catch (e) { res.push({ tipo: t, ok: false, status: "erro de rede" }); }
+  }
+  s.json({ resultados: res });
 }));
 
 // --- Fotos em lote para o Efetivo (até 100 por vez)
