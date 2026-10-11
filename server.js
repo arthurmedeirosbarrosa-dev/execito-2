@@ -222,15 +222,17 @@ function cdpInfo(id, roleId, superUser) {
 
 // 3) O site troca o código de uma única vez por nick + patente atual no grupo.
 app.get("/api/session", async (q, s) => {
-  const session = oneTime.get(q.query.code);
-  oneTime.delete(q.query.code);
-  const me = session && sessions.get(session);
-  if (!me) return s.json({ error: "Login expirado, entre de novo." });
-  const r = await role(me.id);
-  if (!r) return s.json({ error: "Você não está no grupo do jogo." });
-  const sup = isSuper(me.nick, r.name);
-  s.json({ token: session, nick: me.nick, label: r.name, isSuper: sup, cfg: CONFIG_USERS.includes(me.nick.toLowerCase()),
-           perm: permDe(me.nick, r.name, r.id), avatar: await avatar(me.id), cdp: cdpInfo(me.id, r.id, sup) });
+  try {
+    const session = oneTime.get(q.query.code);
+    oneTime.delete(q.query.code);
+    const me = session && sessions.get(session);
+    if (!me) return s.json({ error: "Login expirado, entre de novo." });
+    const r = await role(me.id);
+    if (!r) return s.json({ error: "Você não está no grupo do jogo." });
+    const sup = isSuper(me.nick, r.name);
+    s.json({ token: session, nick: me.nick, label: r.name, isSuper: sup, cfg: CONFIG_USERS.includes(me.nick.toLowerCase()),
+             perm: permDe(me.nick, r.name, r.id), avatar: await avatar(me.id), cdp: cdpInfo(me.id, r.id, sup) });
+  } catch (e) { s.json({ error: "O Roblox está sobrecarregado agora. Espere 1 minuto e entre de novo." }); }
 });
 
 // Atualiza o cabeçalho (patente + CDP) sem precisar logar de novo. O site chama a cada ~30s.
@@ -258,10 +260,20 @@ async function user(nick) {
   });
   return d.data && d.data[0];
 }
+const roleCache = new Map(); // guarda o cargo por 45 s: com muita gente entrando, o Roblox limita as consultas (erro 429)
 async function role(id) { // cargo atual no grupo: {id, name, rank}
-  const d = await j(`https://groups.roblox.com/v2/users/${id}/groups/roles`);
-  const g = d.data.find(x => String(x.group.id) === String(GROUP));
-  return g && g.role;
+  const k = String(id), c = roleCache.get(k);
+  if (c && Date.now() - c.t < 45000) return c.v;
+  let d = null;
+  for (let i = 0; i < 3; i++) {
+    const r = await fetch(`https://groups.roblox.com/v2/users/${id}/groups/roles`);
+    if (r.status === 429 || r.status >= 500) { await new Promise(x => setTimeout(x, 500 * (i + 1))); continue; }
+    d = await r.json().catch(() => null); break;
+  }
+  if (!d || !Array.isArray(d.data)) throw new Error("Roblox indisponível");
+  const g = d.data.find(x => String(x.group.id) === String(GROUP)), v = g ? g.role : null;
+  if (v) roleCache.set(k, { t: Date.now(), v });
+  return v;
 }
 
 // ================= Sistema de permissões =================
@@ -404,6 +416,7 @@ app.post("/api/promote", async (q, s) => {
       return s.json({ error: `O Roblox recusou (status ${r.status}): ${detail.slice(0, 300)}` });
     }
 
+    roleCache.delete(String(t.id));
     db.hist.push({ id: t.id, nick: t.name, from: cur.name, to: next.name, by: me.nick, date: new Date().toISOString() });
     const tipoAcao = baixou ? "Rebaixamento" : (atipicaUsada ? "Promoção Atípica" : "Promoção Normal");
     if (baixou) { const f = db.fichas[t.id] || (db.fichas[t.id] = { estado: "Ativo", registros: [] });
@@ -681,5 +694,8 @@ app.get("/api/cargos", async (q, s) => {
     });
   } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
 });
+
+process.on("unhandledRejection", e => console.log("Erro não tratado:", e && e.message));
+process.on("uncaughtException", e => console.log("Erro inesperado:", e && e.message));
 
 app.listen(process.env.PORT || 3000);
