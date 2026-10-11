@@ -201,7 +201,7 @@ app.get("/auth/callback", async (q, s) => {
     const volta = new URL(SITE);
     volta.searchParams.set("authcode", authcode);
     s.redirect(volta.toString());
-  } catch (e) { falha("callback", e.message); s.status(500).send(aviso("Falha ao falar com o Roblox. Tente de novo em instantes.")); }
+  } catch (e) { falha("callback", e.message); s.status(500).send(aviso("Falha ao falar com o Roblox (" + String(e.message).replace(/[^\w .:-]/g, "").slice(0, 60) + "). Tente de novo em instantes.")); }
 });
 
 // Foto de perfil (headshot) do Roblox para um ID de usuário.
@@ -237,8 +237,8 @@ app.get("/api/session", async (q, s) => {
     const sup = isSuper(me.nick, r.name);
     loginsOk++;
     s.json({ token: session, nick: me.nick, label: r.name, isSuper: sup, cfg: CONFIG_USERS.includes(me.nick.toLowerCase()),
-             perm: permDe(me.nick, r.name, r.id), avatar: await avatar(me.id), cdp: cdpInfo(me.id, r.id, sup) });
-  } catch (e) { falha("sessão", e.message); s.json({ error: "O Roblox está sobrecarregado agora. Espere 1 minuto e entre de novo." }); }
+             perm: permDe(me.nick, r.name, r.id), cdp: cdpInfo(me.id, r.id, sup) });
+  } catch (e) { falha("sessão", e.message); s.json({ error: "O Roblox está sobrecarregado agora (" + String(e.message).replace(/[^\w .:-]/g, "").slice(0, 60) + "). Espere 1 minuto e entre de novo." }); }
 });
 
 // Atualiza o cabeçalho (patente + CDP) sem precisar logar de novo. O site chama a cada ~30s.
@@ -249,7 +249,7 @@ app.get("/api/me", async (q, s) => {
     const r = await role(me.id);
     if (!r) return s.json({ error: "Você não está no grupo do jogo." });
     const sup = isSuper(me.nick, r.name);
-    s.json({ nick: me.nick, label: r.name, isSuper: sup, cfg: CONFIG_USERS.includes(me.nick.toLowerCase()), perm: permDe(me.nick, r.name, r.id), avatar: await avatar(me.id), cdp: cdpInfo(me.id, r.id, sup) });
+    s.json({ nick: me.nick, label: r.name, isSuper: sup, cfg: CONFIG_USERS.includes(me.nick.toLowerCase()), perm: permDe(me.nick, r.name, r.id), cdp: cdpInfo(me.id, r.id, sup) });
   } catch (e) { s.json({ error: "Falha ao falar com o Roblox." }); }
 });
 
@@ -266,10 +266,30 @@ async function user(nick) {
   });
   return d.data && d.data[0];
 }
+let rolesCache = { t: 0, porId: {} };
+async function cargosGrupo() { // lista de cargos do grupo (id -> nome), guardada por 10 min
+  if (Date.now() - rolesCache.t < 600000 && Object.keys(rolesCache.porId).length) return rolesCache.porId;
+  const d = await j(`https://groups.roblox.com/v1/groups/${GROUP}/roles`);
+  if (!d || !Array.isArray(d.roles)) throw new Error("lista de cargos indisponível");
+  const porId = {}; d.roles.forEach(x => { porId[String(x.id)] = { id: x.id, name: x.name, rank: x.rank }; });
+  rolesCache = { t: Date.now(), porId }; return porId;
+}
+async function roleCloud(id) { // undefined = não deu para consultar por aqui (usa a API pública)
+  if (!KEY) return undefined;
+  try {
+    const r = await fetch(`https://apis.roblox.com/cloud/v2/groups/${GROUP}/memberships?maxPageSize=1&filter=${encodeURIComponent(`user == 'users/${id}'`)}`, { headers: { "x-api-key": KEY } });
+    if (!r.ok) return undefined;
+    const d = await r.json(), m = (d.groupMemberships || [])[0];
+    if (!m) return null;
+    return (await cargosGrupo())[String(m.role || "").split("/").pop()] || undefined;
+  } catch (e) { return undefined; }
+}
 const roleCache = new Map(); // guarda o cargo por 45 s: com muita gente entrando, o Roblox limita as consultas (erro 429)
 async function role(id) { // cargo atual no grupo: {id, name, rank}
   const k = String(id), c = roleCache.get(k);
   if (c && Date.now() - c.t < 45000) return c.v;
+  const nuvem = await roleCloud(id);
+  if (nuvem !== undefined) { if (nuvem) roleCache.set(k, { t: Date.now(), v: nuvem }); return nuvem; }
   let d = null;
   for (let i = 0; i < 3; i++) {
     const r = await fetch(`https://groups.roblox.com/v2/users/${id}/groups/roles`);
