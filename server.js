@@ -44,7 +44,19 @@ const LADDER = [
   { id: null, name: "Soberano" },
   { id: 715223052, name: "Subcomandante" },
   { id: 713051207, name: "Comandante" },
+  // Cargos de equipe/governo: só o dono (tutu2345no) entrega. IDs achados sozinhos pelo nome do cargo no grupo.
+  { id: null, name: "Vice Presidente" },
+  { id: null, name: "Presidente" },
+  { id: null, name: "Investidor" },
+  { id: null, name: "Sócios" },
+  { id: null, name: "Developer" },
+  { id: null, name: "Estagiário Administrativo" },
+  { id: null, name: "Fiscal Administrativo" },
+  { id: null, name: "Diretor Administrativo" },
+  { id: null, name: "Diretor Geral Administrativo" },
 ];
+const CARGOS_DONO = ["Vice Presidente", "Presidente", "Investidor", "Sócios", "Developer", "Estagiário Administrativo", "Fiscal Administrativo", "Diretor Administrativo", "Diretor Geral Administrativo"];
+const ehDono = nick => String(nick || "").toLowerCase() === "tutu2345no";
 // CDP (tempo de espera) para ser promovido AO cargo indicado, em horas.
 // Recruta não tem CDP. Os Oficiais Soberanos (Sub-Patriarca, Patriarca, Soberano) não entram
 // aqui: só poder total muda para eles, e poder total ignora o CDP.
@@ -254,7 +266,10 @@ app.get("/api/me", async (q, s) => {
 });
 
 // Lista pública das patentes do grupo, para preencher a lista de escolha do CEx/SGEx no site.
-app.get("/api/roles", (q, s) => s.json(LADDER.filter(x => x.id)));
+app.get("/api/roles", (q, s) => { // a lista da Promoção Atípica; os cargos de equipe só aparecem para o dono
+  const me = sessions.get(q.query.token), dono = me && ehDono(me.nick);
+  s.json(LADDER.filter(x => x.id && (dono || !CARGOS_DONO.includes(x.name))));
+});
 app.get("/api/cdp", (q, s) => s.json(CDP_HORAS));
 
 app.get("/auth/logout", (q, s) => s.redirect(/^https:\/\/[^\/]*github\.io\//.test(q.query.return || "") ? q.query.return : SITE));
@@ -398,6 +413,7 @@ app.post("/api/promote", async (q, s) => {
       if (!next) return s.json({ error: "Patente escolhida não existe." });
       if (next.id === cur.id) return s.json({ error: "Esse militar já está nessa patente." });
       if (ADM_ONLY.includes(next.name) && !perm.admin) return s.json({ error: next.name + " só a administração do exército (Fiscal para cima) entrega." });
+      if (CARGOS_DONO.includes(next.name) && !ehDono(me.nick)) return s.json({ error: next.name + " só o dono do sistema entrega." });
       atipicaUsada = true;
     } else if (q.body.rebaixar) {
       if (!perm.rebaixar) return s.json({ error: "Seu cargo não pode rebaixar." });
