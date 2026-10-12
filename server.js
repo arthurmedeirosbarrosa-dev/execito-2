@@ -373,7 +373,8 @@ app.post("/api/promote", async (q, s) => {
     if (!me) return s.json({ error: "Sessão inválida. Entre de novo." });
     const t = await user(q.body.target);
     if (!t) return s.json({ error: "Militar não encontrado." });
-    if (String(t.id) === String(me.id)) return s.json({ error: "Você não pode promover a si mesmo." });
+    // Só o dono (tutu2345no) pode mudar a própria patente. Todo o resto: ninguém se promove, nem a CEx.
+    if (String(t.id) === String(me.id) && String(me.nick).toLowerCase() !== "tutu2345no") return s.json({ error: "Você não pode promover a si mesmo. Só o dono do sistema pode." });
     // Trava por militar: só uma ação por vez (impede o "spam" de cliques/requisições simultâneas).
     const chave = String(t.id);
     if (trabalhando.has(chave)) return s.json({ error: "Já tem uma ação em andamento para esse militar. Aguarde." });
