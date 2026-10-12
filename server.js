@@ -456,7 +456,8 @@ app.post("/api/promote", async (q, s) => {
     if (!r.ok) {
       desfazer();
       const detail = await r.text().catch(() => "");
-      const dica = r.status === 403 ? " Causa provável: quem criou a chave da API tem um cargo mais baixo que " + next.name + " (ou sem a permissão de alterar cargos), ou a chave não tem a permissão group:write."
+      const dica = /same user/i.test(detail) ? " O Roblox não deixa a conta que criou a chave da API mudar o PRÓPRIO cargo. Peça para outra pessoa com cargo alto mudar o seu cargo no grupo, ou use uma chave criada por outra conta."
+        : r.status === 403 ? " Causa provável: quem criou a chave da API tem um cargo mais baixo que " + next.name + " (ou sem a permissão de alterar cargos), ou a chave não tem a permissão group:write."
         : r.status === 401 ? " A chave da API é inválida ou venceu."
         : r.status === 404 ? " O cargo ou o membro não foi achado no grupo."
         : r.status === 429 ? " O Roblox está limitando. Espere um pouco." : "";
