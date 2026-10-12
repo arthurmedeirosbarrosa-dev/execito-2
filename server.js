@@ -456,7 +456,11 @@ app.post("/api/promote", async (q, s) => {
     if (!r.ok) {
       desfazer();
       const detail = await r.text().catch(() => "");
-      return s.json({ error: `O Roblox recusou (status ${r.status}): ${detail.slice(0, 300)}` });
+      const dica = r.status === 403 ? " Causa provável: quem criou a chave da API tem um cargo mais baixo que " + next.name + " (ou sem a permissão de alterar cargos), ou a chave não tem a permissão group:write."
+        : r.status === 401 ? " A chave da API é inválida ou venceu."
+        : r.status === 404 ? " O cargo ou o membro não foi achado no grupo."
+        : r.status === 429 ? " O Roblox está limitando. Espere um pouco." : "";
+      return s.json({ error: `O Roblox recusou (status ${r.status}).${dica} ${detail.slice(0, 200)}` });
     }
 
     roleCache.delete(String(t.id));
