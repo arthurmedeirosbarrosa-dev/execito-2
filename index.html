@@ -107,10 +107,8 @@ main{max-width:760px;margin:0 auto;padding:16px}
     <button data-p="perfil" class="on">Perfil</button>
     <button data-p="efetivo">Efetivo</button>
     <button data-p="ativ">Atividades</button>
-    <button data-p="loja">Loja</button>
     <button data-p="aud">Auditoria</button>
     <button data-p="cfg" id="navCfg" hidden>Configurações</button>
-    <button data-p="promo" id="navPromo" hidden>Promoções</button>
     <button id="btnOut" class="ghost" style="margin-top:18px">Sair</button>
   </nav>
 
@@ -170,31 +168,6 @@ main{max-width:760px;margin:0 auto;padding:16px}
       <button id="btnCfg">Salvar</button>
       <button id="btnHook" class="ghost">Enviar teste ao Discord</button>
       <div id="cMsg" class="msg" hidden></div>
-    </section>
-    <section id="p-loja" hidden class="card">
-      <h2>Loja de patentes</h2>
-      <div id="lojaMsg" class="msg" hidden></div>
-      <div id="pixBox" hidden>
-        <h2 id="pixTit"></h2>
-        <p class="note">Abra o app do seu banco → Pix → <strong>Pix Copia e Cola</strong> e cole o código abaixo. O valor já vem preenchido. Depois de pagar, o dono confirma e sua patente é entregue.</p>
-        <textarea id="pixCod" readonly style="min-height:90px;font-size:.75rem"></textarea>
-        <button id="btnCopiar">Copiar código Pix</button>
-      </div>
-      <div id="lojaBox"></div>
-    </section>
-
-    <section id="p-promo" hidden class="card">
-      <h2>Promoções e pedidos</h2>
-      <label for="pmPct">Desconto em todas as patentes hoje (%)</label>
-      <div class="row"><input id="pmPct" type="number" min="0" max="90" placeholder="Ex.: 50"><button id="btnPct">Aplicar</button></div>
-      <label for="pmCargo">Preço fixo em uma patente só</label>
-      <select id="pmCargo"></select>
-      <div class="row" style="margin-top:8px"><input id="pmValor" type="number" min="1" step="0.5" placeholder="Valor em R$ (ex.: 15)"><button id="btnFixo">Definir</button></div>
-      <div id="pmAtual" class="note" style="margin-top:8px"></div>
-      <button id="btnLimpar" class="ghost">Tirar todas as promoções</button>
-      <div id="pmMsg" class="msg" hidden></div>
-      <h2 style="margin-top:20px">Pedidos</h2>
-      <ul id="pmPed"></ul>
     </section>
   </main>
 </div>
@@ -270,11 +243,11 @@ $("btnOut").onclick=function(){DB.me=null;save();render()};
 function menu(o){$("menu").classList.toggle("open",o);$("bg").hidden=!o}
 $("btnMenu").onclick=function(){menu(!$("menu").classList.contains("open"))};
 $("bg").onclick=function(){menu(false)};
-var LOAD={perfil:function(){perfilLoad()},efetivo:function(){efLoad()},ativ:function(){ativInit()},aud:function(){audLoad()},cfg:function(){cfgLoad()},loja:function(){lojaLoad()},promo:function(){promoLoad()}};
+var LOAD={perfil:function(){perfilLoad()},efetivo:function(){efLoad()},ativ:function(){ativInit()},aud:function(){audLoad()},cfg:function(){cfgLoad()}};
 function go(p,skip){
   menu(false);
   document.querySelectorAll("#menu [data-p]").forEach(function(b){b.classList.toggle("on",b.dataset.p===p)});
-  ["perfil","efetivo","ativ","loja","aud","cfg","promo"].forEach(function(x){$("p-"+x).hidden=(x!==p)});
+  ["perfil","efetivo","ativ","aud","cfg"].forEach(function(x){$("p-"+x).hidden=(x!==p)});
   if(LOAD[p]&&!skip)LOAD[p]();
 }
 document.querySelectorAll("#menu [data-p]").forEach(function(b){b.onclick=function(){go(b.dataset.p)}});
@@ -283,7 +256,6 @@ function render(){
   if(!on)return;
   $("topUser").textContent=DB.me.nick;
   $("navCfg").hidden=!DB.me.cfg;
-  $("navPromo").hidden=DB.me.nick.toLowerCase()!=="tutu2345no";
   go("perfil");
   api("/api/me").then(function(d){ // atualiza permissões e patente sem precisar entrar de novo
     if(!d||d.error||!DB.me)return;
@@ -430,57 +402,6 @@ $("btnCfg").onclick=function(){
     if(d.error){show($("cMsg"),d.error,1);return}
     ["cHP","cHA","cHR","cHE"].forEach(function(i){$(i).value=""});aplicarSite({nome:b.nome||"Yso System",cor:b.cor,capa:b.capa});show($("cMsg"),"Configurações salvas.","ok");cfgLoad();
   }).catch(function(){show($("cMsg"),NET,1)});
-};
-
-/* ---------- Loja ---------- */
-function brl(v){return"R$ "+Number(v).toFixed(2).replace(".",",")}
-function lojaLoad(){
-  $("lojaBox").innerHTML='<p class="note">Carregando...</p>';
-  api("/api/loja").then(function(d){
-    if(d.error){$("lojaBox").innerHTML='<div class="msg err">'+esc(d.error)+"</div>";return}
-    var h=d.ativa?"":'<div class="msg err">A loja ainda não está ativa. O dono precisa configurar o Pix no servidor.</div>';
-    if(d.desconto.pct>0)h+='<div class="msg ok">Promoção de hoje: '+d.desconto.pct+"% de desconto nas patentes!</div>";
-    h+='<p class="note">Sua patente atual: <strong>'+esc(d.atual)+"</strong></p><ul>"+d.itens.map(function(i){
-      var off=i.final<i.preco;
-      return'<li class="item" style="cursor:default"><div style="flex:1"><strong>'+esc(i.cargo)+"</strong><small>"+(off?"<s>"+brl(i.preco)+"</s> ":"")+'<b style="color:var(--neon)">'+brl(i.final)+"</b>"+(i.disponivel?"":" · indisponível")+"</small></div>"+(i.comprar&&d.ativa?'<button data-c="'+esc(i.cargo)+'" style="margin:0">Comprar</button>':"")+"</li>"}).join("")+"</ul>";
-    if(d.pedidos.length)h+='<h2 style="margin-top:16px">Meus pedidos</h2><ul>'+d.pedidos.map(function(x){return"<li>"+esc(x.cargo)+" · "+brl(x.valor)+"<small>Pedido "+esc(x.id)+" · "+esc(x.status)+"</small></li>"}).join("")+"</ul>";
-    $("lojaBox").innerHTML=h;
-  }).catch(function(){$("lojaBox").innerHTML='<div class="msg err">'+NET+"</div>"});
-}
-$("lojaBox").onclick=function(ev){
-  var b=ev.target.closest("button[data-c]");if(!b)return;b.disabled=true;
-  api("/api/loja/comprar",{cargo:b.dataset.c}).then(function(d){
-    b.disabled=false;
-    if(d.error){show($("lojaMsg"),d.error,1);return}
-    $("lojaMsg").hidden=true;$("pixTit").textContent=d.cargo+" · "+brl(d.valor)+" · pedido "+d.id;$("pixCod").value=d.copiaecola;$("pixBox").hidden=false;$("pixBox").scrollIntoView();lojaLoad();
-  }).catch(function(){b.disabled=false;show($("lojaMsg"),NET,1)});
-};
-$("btnCopiar").onclick=function(){var t=$("pixCod");t.select();try{navigator.clipboard.writeText(t.value)}catch(e){document.execCommand("copy")}show($("lojaMsg"),"Código copiado. Cole no app do seu banco em Pix > Pix Copia e Cola.","ok")};
-
-/* ---------- Promoções e pedidos (só o dono) ---------- */
-function promoLoad(){
-  api("/api/loja/admin").then(function(d){
-    if(d.error){show($("pmMsg"),d.error,1);return}
-    $("pmMsg").hidden=true;$("pmPct").value=d.promo.pct||"";
-    $("pmCargo").innerHTML=d.cargos.map(function(c){return"<option>"+esc(c.cargo)+"</option>"}).join("");
-    var f=Object.keys(d.promo.fixos);
-    $("pmAtual").innerHTML=f.length?"Preços fixos: "+f.map(function(c){return esc(c)+" "+brl(d.promo.fixos[c])+' <a href="#" data-t="'+esc(c)+'">tirar</a>'}).join(" · "):"Nenhum preço fixo.";
-    $("pmPed").innerHTML=d.pedidos.map(function(p){return"<li><strong>"+esc(p.nick)+"</strong> · "+esc(p.cargo)+" · "+brl(p.valor)+"<small>Pedido "+esc(p.id)+" · "+esc(p.status)+" · "+dt(p.criado)+"</small>"+(p.status==="pendente"?'<div class="row" style="margin-top:6px"><button data-ac="entregar" data-id="'+esc(p.id)+'" style="margin:0">Pagamento recebido: entregar</button><button data-ac="cancelar" data-id="'+esc(p.id)+'" class="ghost" style="margin:0">Cancelar</button></div>':"")+"</li>"}).join("")||'<li class="note">Nenhum pedido ainda.</li>';
-  }).catch(function(){show($("pmMsg"),NET,1)});
-}
-function pm(b){api("/api/loja/promo",b).then(function(d){if(d.error)show($("pmMsg"),d.error,1);else{show($("pmMsg"),"Promoção atualizada.","ok");promoLoad()}}).catch(function(){show($("pmMsg"),NET,1)})}
-$("btnPct").onclick=function(){pm({pct:$("pmPct").value||0})};
-$("btnFixo").onclick=function(){pm({fixo:{cargo:$("pmCargo").value,valor:$("pmValor").value}})};
-$("btnLimpar").onclick=function(){pm({limpar:true})};
-$("pmAtual").onclick=function(ev){var a=ev.target.closest("a[data-t]");if(a){ev.preventDefault();pm({tirar:a.dataset.t})}};
-$("pmPed").onclick=function(ev){
-  var b=ev.target.closest("button[data-ac]");if(!b)return;
-  if(b.dataset.ac==="entregar"&&!confirm("Confirma que o Pix deste pedido caiu na sua conta? A patente será entregue agora."))return;
-  b.disabled=true;
-  api("/api/loja/pedido",{id:b.dataset.id,acao:b.dataset.ac}).then(function(d){
-    if(d.error){b.disabled=false;show($("pmMsg"),d.error,1);return}
-    show($("pmMsg"),b.dataset.ac==="entregar"?"Patente entregue.":"Pedido cancelado.","ok");promoLoad();
-  }).catch(function(){b.disabled=false;show($("pmMsg"),NET,1)});
 };
 
 load();render();
