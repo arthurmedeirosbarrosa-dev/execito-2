@@ -116,7 +116,7 @@ const pending  = new Map();   // state  -> return URL (anti-CSRF do login)
 const oneTime  = new Map();   // authcode -> token (troca única depois do redirect)
 
 // ---- Armazenamento (Postgres se houver DATABASE_URL; senão só memória) ----
-const db = { lastPromo: {}, hist: [], fichas: {}, audit: [], treinos: [], atividades: [], orgs: [], config: {} };
+const db = { lastPromo: {}, hist: [], fichas: {}, audit: [], treinos: [], atividades: [], orgs: [], config: {}, pedidos: [] };
 let pool = null, saving;
 (async () => {
   try {
@@ -752,6 +752,78 @@ app.get("/api/diag", async (q, s) => {
   try { const r = await fetch("https://groups.roblox.com/v2/users/1/groups/roles"); out.publico_status = r.status; } catch (e) { out.publico_status = "erro: " + e.message; }
   s.json(out);
 });
+
+// ================= Loja de patentes (Pix) =================
+// A chave Pix NÃO fica no código (o repositório é público): defina PIX_CHAVE no Render. Opcionais: PIX_NOME e PIX_CIDADE.
+const PRECOS = { "Soberano": 120, "Patriarca": 105, "Sub-Patriarca": 90, "General de Exército": 70, "General de Divisão": 65, "General de Brigada": 60,
+  "General em Treinamento": 55, "Coronel": 50, "Tenente Coronel": 45, "Major": 40, "Capitão": 35, "Primeiro Tenente": 30, "Segundo Tenente": 25,
+  "Aspirante à Oficial": 20, "Cadete": 18, "Subtenente": 15, "Primeiro Sargento": 12, "Segundo Sargento": 9, "Terceiro Sargento": 6 };
+const promo = () => { const p = db.config.promo || (db.config.promo = { pct: 0, fixos: {} }); p.fixos = p.fixos || {}; return p; };
+const precoFinal = cargo => { const base = PRECOS[cargo], p = promo(), fx = Number(p.fixos[cargo]);
+  const v = fx > 0 ? fx : base * (1 - (Number(p.pct) || 0) / 100); return Math.max(1, Math.min(base, Math.round(v * 100) / 100)); };
+const posCargo = cargo => { const i = LADDER.findIndex(x => x.name === cargo); return i !== -1 ? i : LADDER.findIndex(x => x.name === "General de Brigada") - 0.5; }; // "General em Treinamento" fica antes de General de Brigada
+async function acharCargo(nome) { // cargo no grupo: pela escada ou pelo nome (ignora a tag [XX])
+  const e = LADDER.find(x => x.name === nome && x.id); if (e) return { id: e.id, name: e.name };
+  const limpa = x => norm(x).replace(/^\[[^\]]*\]\s*/, "").trim();
+  const g = Object.values(await cargosGrupo()).find(x => limpa(x.name) === limpa(nome));
+  return g ? { id: g.id, name: g.name } : null;
+}
+const asc = x => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9 ]/g, "").trim();
+function crc16(str) { let c = 0xFFFF; for (const ch of Buffer.from(str, "utf8")) { c ^= ch << 8; for (let i = 0; i < 8; i++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xFFFF : (c << 1) & 0xFFFF; } return c.toString(16).toUpperCase().padStart(4, "0"); }
+function brcode(valor, txid) { // Pix "copia e cola" com o valor exato; o dinheiro cai direto na conta dona da chave
+  const f = (id, v) => id + String(v.length).padStart(2, "0") + v;
+  const p = f("00", "01") + f("01", "11") + f("26", f("00", "br.gov.bcb.pix") + f("01", process.env.PIX_CHAVE.trim())) + f("52", "0000") + f("53", "986")
+    + f("54", Number(valor).toFixed(2)) + f("58", "BR") + f("59", (asc(process.env.PIX_NOME) || "YSO SYSTEM").slice(0, 25)) + f("60", (asc(process.env.PIX_CIDADE) || "BRASIL").slice(0, 15))
+    + f("62", f("05", String(txid).replace(/[^A-Za-z0-9]/g, "").slice(0, 25))) + "6304";
+  return p + crc16(p);
+}
+
+app.get("/api/loja", wrap(async (q, s, w) => {
+  const cur = idxDe(w.role.name, w.role.id), p = promo(), itens = [];
+  for (const cargo of Object.keys(PRECOS)) { const c = await acharCargo(cargo);
+    itens.push({ cargo, preco: PRECOS[cargo], final: precoFinal(cargo), disponivel: !!c, comprar: !!c && posCargo(cargo) > cur }); }
+  s.json({ ativa: !!process.env.PIX_CHAVE, desconto: { pct: Number(p.pct) || 0, fixos: p.fixos }, atual: w.role.name, itens,
+    pedidos: db.pedidos.filter(x => String(x.userId) === String(w.id)).slice(-5).reverse().map(x => ({ id: x.id, cargo: x.cargo, valor: x.valor, status: x.status })) });
+}));
+app.post("/api/loja/comprar", wrap(async (q, s, w) => {
+  if (!process.env.PIX_CHAVE) return s.json({ error: "A loja ainda não está ativa (falta configurar o Pix no servidor)." });
+  const cargo = String(q.body.cargo || ""); if (!PRECOS[cargo]) return s.json({ error: "Cargo inválido." });
+  if (!(await acharCargo(cargo))) return s.json({ error: "Esse cargo não está disponível no grupo." });
+  if (posCargo(cargo) <= idxDe(w.role.name, w.role.id)) return s.json({ error: "Você já tem essa patente ou uma maior." });
+  if (db.pedidos.filter(x => String(x.userId) === String(w.id) && x.status === "pendente").length >= 3) return s.json({ error: "Você já tem 3 pedidos aguardando pagamento." });
+  const valor = precoFinal(cargo), id = id6().toUpperCase();
+  db.pedidos.push({ id, userId: String(w.id), nick: w.nick, cargo, valor, original: PRECOS[cargo], status: "pendente", criado: new Date().toISOString() });
+  if (db.pedidos.length > 500) db.pedidos.shift();
+  audit(q, w.nick, "Pedido de compra", `${cargo} por R$ ${valor.toFixed(2)} (pedido ${id})`);
+  s.json({ id, valor, cargo, copiaecola: brcode(valor, "YSO" + id) });
+}));
+
+// Só o dono (tutu2345no): descontos e pedidos
+const soDono = fn => wrap(async (q, s, w) => ehDono(w.nick) ? fn(q, s, w) : s.json(NOPERM));
+app.get("/api/loja/admin", soDono((q, s) => s.json({ promo: promo(), cargos: Object.keys(PRECOS).map(c => ({ cargo: c, preco: PRECOS[c] })), pedidos: db.pedidos.slice(-100).reverse() })));
+app.post("/api/loja/promo", soDono((q, s, w) => {
+  const b = q.body, p = promo();
+  if (b.limpar) { p.pct = 0; p.fixos = {}; }
+  if (b.pct !== undefined) { const n = Number(b.pct); if (!(n >= 0 && n <= 90)) return s.json({ error: "O desconto geral vai de 0 a 90%." }); p.pct = n; }
+  if (b.fixo) { const v = Number(b.fixo.valor); if (!PRECOS[b.fixo.cargo] || !(v >= 1)) return s.json({ error: "Escolha o cargo e um preço de pelo menos R$ 1." }); p.fixos[b.fixo.cargo] = v; }
+  if (b.tirar) delete p.fixos[b.tirar];
+  audit(q, w.nick, "Desconto da loja", `Geral ${p.pct}% · fixos: ${Object.entries(p.fixos).map(([c, v]) => c + " R$ " + v).join(", ") || "nenhum"}`); s.json({ ok: true });
+}));
+app.post("/api/loja/pedido", soDono(async (q, s, w) => {
+  const ped = db.pedidos.find(x => x.id === q.body.id);
+  if (!ped) return s.json({ error: "Pedido não encontrado." });
+  if (ped.status !== "pendente") return s.json({ error: "Esse pedido já está: " + ped.status + "." });
+  if (q.body.acao === "cancelar") { ped.status = "cancelado"; audit(q, w.nick, "Pedido cancelado", `${ped.nick}: ${ped.cargo} (pedido ${ped.id})`); return s.json({ ok: true }); }
+  if (q.body.acao !== "entregar") return s.json({ error: "Ação inválida." });
+  const c = await acharCargo(ped.cargo); if (!c) return s.json({ error: "O cargo não existe no grupo." });
+  const cur = await role(ped.userId); if (!cur) return s.json({ error: "O comprador não está mais no grupo." });
+  ped.status = "entregando"; // trava contra clique duplo
+  const r = await fetch(`https://apis.roblox.com/cloud/v2/groups/${GROUP}/memberships/${ped.userId}`, { method: "PATCH", headers: { "x-api-key": KEY, "Content-Type": "application/json" }, body: JSON.stringify({ role: `groups/${GROUP}/roles/${c.id}` }) }).catch(() => null);
+  if (!r || !r.ok) { ped.status = "pendente"; const d = r ? await r.text().catch(() => "") : ""; return s.json({ error: `O Roblox recusou${r ? " (status " + r.status + ")" : ""}. ${d.slice(0, 200)}` }); }
+  roleCache.delete(String(ped.userId)); ped.status = "entregue"; ped.entregue = new Date().toISOString();
+  db.hist.push({ id: Number(ped.userId), nick: ped.nick, from: cur.name, to: c.name, by: w.nick, date: ped.entregue });
+  audit(q, w.nick, "Promoção Atípica", `${ped.nick}: ${cur.name} → ${c.name} (compra, pedido ${ped.id}, R$ ${ped.valor.toFixed(2)})`); s.json({ ok: true });
+}));
 
 process.on("unhandledRejection", e => console.log("Erro não tratado:", e && e.message));
 process.on("uncaughtException", e => console.log("Erro inesperado:", e && e.message));
